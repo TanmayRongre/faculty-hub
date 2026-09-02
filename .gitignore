@@ -5,15 +5,16 @@ frontend/node_modules/
 
 # Environment Variables & Secrets (CRITICAL)
 .env
-.env.*
-!.env.example
-*.env
+.env.local
+.env.development
 backend/.env
 frontend/.env
 *.json.key
 service-account*.json
 credentials*.json
 google-credentials*.json
+!.env.example
+!frontend/.env.production
 
 # Build Outputs
 dist/
