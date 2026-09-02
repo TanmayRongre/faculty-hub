@@ -31,8 +31,8 @@ const connectDB = async () => {
   } catch (error) {
     console.error(`MongoDB connection error: ${error.message}`);
     isConnecting = false;
-    console.log('Retrying MongoDB connection in 3 seconds...');
-    setTimeout(connectDB, 3000);
+    console.log('Retrying MongoDB connection in 5 seconds...');
+    setTimeout(connectDB, 5000);
   }
 };
 

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { wakeUpBackend } from './services/api';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Auth
@@ -50,9 +51,14 @@ const RootRedirect = () => {
   return <Navigate to="/faculty/dashboard" replace />;
 };
 
-const App = () => (
-  <BrowserRouter>
-    <AuthProvider>
+const App = () => {
+  useEffect(() => {
+    wakeUpBackend();
+  }, []);
+
+  return (
+    <BrowserRouter>
+      <AuthProvider>
       <Toaster
         position="top-right"
         toastOptions={{
@@ -178,6 +184,7 @@ const App = () => (
       </Routes>
     </AuthProvider>
   </BrowserRouter>
-);
+  );
+};
 
 export default App;
