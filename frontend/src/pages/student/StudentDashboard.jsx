@@ -8,7 +8,6 @@ import {
   BarChart3,
   CalendarCheck2,
   CalendarDays,
-  FolderOpen,
   Megaphone,
   Images,
   LogOut,
@@ -19,7 +18,6 @@ const MODULE_ICONS = {
   'My Marks': BarChart3,
   Attendance: CalendarCheck2,
   Timetable: CalendarDays,
-  Resources: FolderOpen,
   Notices: Megaphone,
   'Activity Gallery': Images,
 };
@@ -39,7 +37,6 @@ const StudentDashboard = () => {
     { label: 'My Marks', desc: 'View your MSBTE marks', to: '/student/marks', ready: true },
     { label: 'Attendance', desc: 'Check your attendance', to: '/student/attendance', ready: true },
     { label: 'Timetable', desc: 'View lecture schedule', to: '/student/timetable', ready: true },
-    { label: 'Resources', desc: 'Notes & study material', to: '/student/resources', ready: true },
     { label: 'Notices', desc: 'Campus announcements', to: '/student/notices', ready: true },
     { label: 'Activity Gallery', desc: 'Extracurricular showcase & achievements', to: '/student/gallery', ready: true },
   ];

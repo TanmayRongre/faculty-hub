@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, CalendarCheck2, CalendarDays, FolderOpen } from 'lucide-react';
+import { BarChart3, CalendarCheck2, CalendarDays } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import FacultyLayout from './FacultyLayout';
@@ -104,7 +104,7 @@ const StudentDetailPage = () => {
 
         {/* Quick Access */}
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Quick Navigation</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             onClick={() => navigate('/faculty/marks')}
             className="p-4 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-left transition-all"
@@ -128,14 +128,6 @@ const StudentDetailPage = () => {
             <CalendarDays size={18} className="text-purple-400 mb-2" aria-hidden="true" />
             <div className="font-semibold text-white text-sm">Timetable & Schedule</div>
             <div className="text-xs text-slate-500 mt-0.5">Weekly Sessions</div>
-          </button>
-          <button
-            onClick={() => navigate('/faculty/resources')}
-            className="p-4 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-left transition-all"
-          >
-            <FolderOpen size={18} className="text-amber-400 mb-2" aria-hidden="true" />
-            <div className="font-semibold text-white text-sm">Notes & Resources</div>
-            <div className="text-xs text-slate-500 mt-0.5">Academic Repository</div>
           </button>
         </div>
       </div>

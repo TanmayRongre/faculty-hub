@@ -26,9 +26,8 @@
 3. **Progressive Assessment (PA) Marks Engine**: Direct PA evaluation scored out of 30 (`0–30`) with bulk *Save All* capabilities.
 4. **Attendance Matrix**: High-speed attendance marking table with Present-by-default toggle and automatic 75% defaulter threshold calculation.
 5. **Smart Timetable & Lecture Scheduler**: Conflict detection across faculty, classrooms, and batches with automated holiday shift logic.
-6. **Academic Resources Repository**: Safe upload and distribution of notes, lab manuals, and question banks.
-7. **Campus Notice Board**: Priority-based announcements (Urgent, Important, Normal) with attachments.
-8. **Extracurricular Activity Gallery**: Student showcase for campus events, hackathons, and achievements with moderation workflow.
+6. **Campus Notice Board**: Priority-based announcements (Urgent, Important, Normal) with attachments.
+7. **Extracurricular Activity Gallery**: Student showcase for campus events, hackathons, and achievements with moderation workflow.
 
 ---
 
@@ -82,7 +81,6 @@ node backend/src/scripts/test_phase3.js
 node backend/src/scripts/test_phase4.js
 node backend/src/scripts/test_phase5.js
 node backend/src/scripts/test_phase6.js
-node backend/src/scripts/test_phase7.js
 node backend/src/scripts/test_phase8.js
 node backend/src/scripts/test_phase9.js
 ```

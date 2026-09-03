@@ -22,7 +22,6 @@ import SheetsStatusPage from './pages/faculty/SheetsStatusPage';
 import MarksManagementPage from './pages/faculty/MarksManagementPage';
 import AttendancePage from './pages/faculty/AttendancePage';
 import FacultyTimetablePage from './pages/faculty/FacultyTimetablePage';
-import FacultyResourcesPage from './pages/faculty/FacultyResourcesPage';
 import FacultyNoticesPage from './pages/faculty/FacultyNoticesPage';
 import FacultyGalleryPage from './pages/faculty/FacultyGalleryPage';
 
@@ -32,7 +31,6 @@ import StudentProfilePage from './pages/student/StudentProfilePage';
 import StudentMarksPage from './pages/student/StudentMarksPage';
 import StudentAttendancePage from './pages/student/StudentAttendancePage';
 import StudentTimetablePage from './pages/student/StudentTimetablePage';
-import StudentResourcesPage from './pages/student/StudentResourcesPage';
 import StudentNoticesPage from './pages/student/StudentNoticesPage';
 import StudentGalleryPage from './pages/student/StudentGalleryPage';
 
@@ -137,11 +135,6 @@ const App = () => {
           <ProtectedRoute roles={['faculty', 'admin']}><FacultyTimetablePage /></ProtectedRoute>
         } />
 
-        {/* Resources & Notes — faculty + admin */}
-        <Route path="/faculty/resources" element={
-          <ProtectedRoute roles={['faculty', 'admin']}><FacultyResourcesPage /></ProtectedRoute>
-        } />
-
         {/* Campus Notices & Circulars — faculty + admin */}
         <Route path="/faculty/notices" element={
           <ProtectedRoute roles={['faculty', 'admin']}><FacultyNoticesPage /></ProtectedRoute>
@@ -167,9 +160,6 @@ const App = () => {
         } />
         <Route path="/student/timetable" element={
           <ProtectedRoute roles={['student']}><StudentTimetablePage /></ProtectedRoute>
-        } />
-        <Route path="/student/resources" element={
-          <ProtectedRoute roles={['student']}><StudentResourcesPage /></ProtectedRoute>
         } />
         <Route path="/student/notices" element={
           <ProtectedRoute roles={['student']}><StudentNoticesPage /></ProtectedRoute>

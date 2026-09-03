@@ -15,7 +15,6 @@ const attendanceRoutes = require('./src/routes/attendanceRoutes');
 const timetableRoutes = require('./src/routes/timetableRoutes');
 const holidayRoutes = require('./src/routes/holidayRoutes');
 const lectureRoutes = require('./src/routes/lectureRoutes');
-const resourceRoutes = require('./src/routes/resourceRoutes');
 const noticeRoutes = require('./src/routes/noticeRoutes');
 const galleryRoutes = require('./src/routes/galleryRoutes');
 
@@ -106,7 +105,6 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/timetable', timetableRoutes);
 app.use('/api/holidays', holidayRoutes);
 app.use('/api/lectures', lectureRoutes);
-app.use('/api/resources', resourceRoutes);
 app.use('/api/notices', noticeRoutes);
 app.use('/api/gallery', galleryRoutes);
 

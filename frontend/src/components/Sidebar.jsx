@@ -12,7 +12,6 @@ import {
   BarChart3,
   CalendarCheck2,
   CalendarDays,
-  FolderOpen,
   Megaphone,
   Images,
   LogOut,
@@ -27,7 +26,6 @@ const NAV_ICONS = {
   '/faculty/marks': BarChart3,
   '/faculty/attendance': CalendarCheck2,
   '/faculty/timetable': CalendarDays,
-  '/faculty/resources': FolderOpen,
   '/faculty/notices': Megaphone,
   '/faculty/gallery': Images,
 };
@@ -69,7 +67,6 @@ const Sidebar = ({ activePath }) => {
     { to: '/faculty/marks', label: 'Marks Management' },
     { to: '/faculty/attendance', label: 'Fast Attendance' },
     { to: '/faculty/timetable', label: 'Smart Scheduler' },
-    { to: '/faculty/resources', label: 'Resources & Notes' },
     { to: '/faculty/notices', label: 'Notice Board' },
     { to: '/faculty/gallery', label: 'Activity Gallery' },
   ];

@@ -10,7 +10,6 @@ import {
   BarChart3,
   CalendarCheck2,
   CalendarDays,
-  FolderOpen,
   Megaphone,
   Images,
 } from 'lucide-react';
@@ -22,7 +21,6 @@ const MODULE_ICONS = {
   'Marks Engine': BarChart3,
   Attendance: CalendarCheck2,
   Scheduler: CalendarDays,
-  Resources: FolderOpen,
   'Notice Board': Megaphone,
   'Activity Gallery': Images,
 };
@@ -62,7 +60,6 @@ const FacultyDashboard = () => {
     { label: 'Marks Engine', desc: 'MSBTE marks & analytics', to: '/faculty/marks' },
     { label: 'Attendance', desc: 'Fast attendance tracking', to: '/faculty/attendance' },
     { label: 'Scheduler', desc: 'Smart lecture planner', to: '/faculty/timetable' },
-    { label: 'Resources', desc: 'Notes & study material', to: '/faculty/resources' },
     { label: 'Notice Board', desc: 'Campus announcements', to: '/faculty/notices' },
     { label: 'Activity Gallery', desc: 'Extracurricular showcase & moderation', to: '/faculty/gallery' },
   ];
