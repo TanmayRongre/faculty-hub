@@ -229,7 +229,7 @@ const FacultyNoticesPage = () => {
 
   return (
     <FacultyLayout>
-      <div className="px-8 py-8">
+      <div className="p-4 sm:p-6 md:p-8 max-w-7xl">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
@@ -274,7 +274,7 @@ const FacultyNoticesPage = () => {
             </form>
 
             {/* Status Tabs */}
-            <div className="flex bg-slate-800 border border-slate-700 rounded-lg p-1">
+            <div className="flex flex-wrap gap-1 bg-slate-800 border border-slate-700 rounded-lg p-1">
               {STATUS_TABS.map(tab => (
                 <button
                   key={tab}
@@ -715,7 +715,7 @@ const FacultyNoticesPage = () => {
         {/* ─── MODAL: EDIT NOTICE ────────────────────────────────────────────── */}
         {editingNotice && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
                 <h3 className="text-lg font-bold text-white">Edit Notice</h3>
                 <button onClick={() => !updatingNotice && setEditingNotice(null)} className="text-slate-400 hover:text-white" aria-label="Close"><X size={18} aria-hidden="true" /></button>

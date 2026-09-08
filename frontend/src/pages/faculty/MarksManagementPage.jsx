@@ -227,25 +227,25 @@ const MarksManagementPage = () => {
 
   return (
     <FacultyLayout>
-      <div className="px-8 py-8">
+      <div className="p-4 sm:p-6 md:p-8 max-w-full">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
               {INSTITUTION.name} • Computer Engineering
             </div>
-            <h1 className="text-2xl font-bold text-white">Theory Marks Management (PA 1 & PA 2)</h1>
-            <p className="text-slate-400 mt-1 text-sm">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Theory Marks Management (PA 1 & PA 2)</h1>
+            <p className="text-slate-400 mt-1 text-xs sm:text-sm">
               5th Semester Assessment • Continuous Progressive Assessment (PA1 + PA2) / 2 = Final PA Mark (Max 30)
             </p>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
             <button
               onClick={loadData}
               disabled={loading || savingAll}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium border border-slate-700 transition-all flex items-center gap-2"
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-medium border border-slate-700 transition-all flex items-center gap-2"
               title="Refresh marks from database"
             >
               <RefreshCw size={15} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
@@ -257,7 +257,7 @@ const MarksManagementPage = () => {
                 id="save-all-marks-btn"
                 onClick={handleSaveAll}
                 disabled={savingAll || loading || students.length === 0}
-                className={`px-5 py-2 rounded-xl font-bold text-sm shadow-lg transition-all flex items-center gap-2 ${
+                className={`px-4 sm:px-5 py-2 rounded-xl font-bold text-xs sm:text-sm shadow-lg transition-all flex items-center gap-2 ${
                   hasChanges
                     ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/40 animate-pulse'
                     : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/30'
@@ -280,7 +280,7 @@ const MarksManagementPage = () => {
         </div>
 
         {/* Subject Navigation Tabs */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4 mb-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             {/* Theory Subjects */}
             <div className="flex flex-wrap items-center gap-2">

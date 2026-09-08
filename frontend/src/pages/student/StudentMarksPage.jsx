@@ -60,7 +60,7 @@ const StudentMarksPage = () => {
     <div className="min-h-screen bg-slate-950 text-white">
       {/* Top Navbar */}
       <header className="border-b border-slate-800 bg-slate-900 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/student/dashboard')}
@@ -84,7 +84,7 @@ const StudentMarksPage = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
@@ -114,35 +114,35 @@ const StudentMarksPage = () => {
         {!loading && !error && (
           <div className="space-y-6">
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="text-xs text-slate-500 mb-1">Theory Subjects</div>
-                <div className="text-2xl font-bold text-white">3 (STE, OSY, ACN)</div>
-                <div className="text-xs text-slate-500 mt-1">PA1 + PA2 Assessment</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4">
+                <div className="text-[11px] sm:text-xs text-slate-500 mb-1">Theory Subjects</div>
+                <div className="text-lg sm:text-2xl font-bold text-white">3 (STE, OSY, ACN)</div>
+                <div className="text-[10px] sm:text-xs text-slate-500 mt-1">PA1 + PA2 Assessment</div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="text-xs text-slate-500 mb-1">Assessed Theory</div>
-                <div className="text-2xl font-bold text-emerald-400">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4">
+                <div className="text-[11px] sm:text-xs text-slate-500 mb-1">Assessed Theory</div>
+                <div className="text-lg sm:text-2xl font-bold text-emerald-400">
                   {summary?.assessedTheorySubjects || 0} / 3
                 </div>
-                <div className="text-xs text-slate-500 mt-1">Evaluated Complete</div>
+                <div className="text-[10px] sm:text-xs text-slate-500 mt-1">Evaluated Complete</div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="text-xs text-slate-500 mb-1">Average Final PA</div>
-                <div className="text-2xl font-bold text-blue-400">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4">
+                <div className="text-[11px] sm:text-xs text-slate-500 mb-1">Average Final PA</div>
+                <div className="text-lg sm:text-2xl font-bold text-blue-400">
                   {summary?.averagePA !== null && summary?.averagePA !== undefined
                     ? `${summary.averagePA} / 30`
                     : 'Not Available'}
                 </div>
-                <div className="text-xs text-slate-500 mt-1">Across Assessed Subjects</div>
+                <div className="text-[10px] sm:text-xs text-slate-500 mt-1">Across Assessed Subjects</div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="text-xs text-slate-500 mb-1">Passing Minimum</div>
-                <div className="text-2xl font-bold text-purple-400">12 / 30</div>
-                <div className="text-xs text-slate-500 mt-1">40% Threshold</div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4">
+                <div className="text-[11px] sm:text-xs text-slate-500 mb-1">Passing Minimum</div>
+                <div className="text-lg sm:text-2xl font-bold text-purple-400">12 / 30</div>
+                <div className="text-[10px] sm:text-xs text-slate-500 mt-1">40% Threshold</div>
               </div>
             </div>
 

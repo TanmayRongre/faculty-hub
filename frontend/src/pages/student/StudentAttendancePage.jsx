@@ -39,7 +39,7 @@ const StudentAttendancePage = () => {
     <div className="min-h-screen bg-slate-950 text-white">
       {/* Top Navbar */}
       <header className="border-b border-slate-800 bg-slate-900 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/student/dashboard')}
@@ -63,7 +63,7 @@ const StudentAttendancePage = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="mb-6">
           <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
             {INSTITUTION.name}
@@ -104,31 +104,31 @@ const StudentAttendancePage = () => {
             )}
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <div className="text-xs text-slate-400">Total Lectures</div>
-                <div className="text-2xl font-bold text-white mt-1">{overall.total}</div>
-                <div className="text-xs text-slate-500 mt-1">Conducted to date</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-5">
+                <div className="text-[11px] sm:text-xs text-slate-400">Total Lectures</div>
+                <div className="text-xl sm:text-2xl font-bold text-white mt-1">{overall.total}</div>
+                <div className="text-[10px] sm:text-xs text-slate-500 mt-1">Conducted to date</div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <div className="text-xs text-emerald-400">Lectures Attended</div>
-                <div className="text-2xl font-bold text-emerald-400 mt-1">{overall.present}</div>
-                <div className="text-xs text-slate-500 mt-1">Classes present</div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-5">
+                <div className="text-[11px] sm:text-xs text-emerald-400">Lectures Attended</div>
+                <div className="text-xl sm:text-2xl font-bold text-emerald-400 mt-1">{overall.present}</div>
+                <div className="text-[10px] sm:text-xs text-slate-500 mt-1">Classes present</div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <div className="text-xs text-red-400">Lectures Missed</div>
-                <div className="text-2xl font-bold text-red-400 mt-1">{overall.absent}</div>
-                <div className="text-xs text-slate-500 mt-1">Classes absent</div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-5">
+                <div className="text-[11px] sm:text-xs text-red-400">Lectures Missed</div>
+                <div className="text-xl sm:text-2xl font-bold text-red-400 mt-1">{overall.absent}</div>
+                <div className="text-[10px] sm:text-xs text-slate-500 mt-1">Classes absent</div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <div className="text-xs text-slate-400">Overall Attendance</div>
-                <div className={`text-2xl font-bold mt-1 ${overall.isDefaulter ? 'text-red-400' : 'text-emerald-400'}`}>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-5">
+                <div className="text-[11px] sm:text-xs text-slate-400">Overall Attendance</div>
+                <div className={`text-xl sm:text-2xl font-bold mt-1 ${overall.isDefaulter ? 'text-red-400' : 'text-emerald-400'}`}>
                   {overall.percentage}%
                 </div>
-                <div className="text-xs mt-1 font-medium">
+                <div className="text-[10px] sm:text-xs mt-1 font-medium truncate">
                   {overall.isDefaulter ? (
                     <span className="text-red-400 font-semibold">Defaulter (&lt;{threshold}%)</span>
                   ) : (

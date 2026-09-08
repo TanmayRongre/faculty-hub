@@ -66,13 +66,13 @@ const FacultyDashboard = () => {
 
   return (
     <FacultyLayout>
-      <div className="px-8 py-8">
-        <div className="mb-8">
+      <div className="p-4 sm:p-6 md:p-8 max-w-7xl">
+        <div className="mb-6 sm:mb-8">
           <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
             {INSTITUTION.name}
           </div>
-          <h1 className="text-2xl font-bold text-white">Faculty & Academic Dashboard</h1>
-          <p className="text-slate-400 mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Faculty & Academic Dashboard</h1>
+          <p className="text-slate-400 mt-1 text-xs sm:text-sm">
             Welcome back, {user?.name}
             <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-blue-600/20 text-blue-400 border border-blue-500/20 capitalize">
               {user?.role}
@@ -80,7 +80,7 @@ const FacultyDashboard = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {modules.map((m) => (
             <ModuleCard key={m.label} {...m} />
           ))}

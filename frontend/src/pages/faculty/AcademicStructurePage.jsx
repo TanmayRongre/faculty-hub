@@ -139,7 +139,7 @@ const AcademicStructurePage = () => {
 
   return (
     <FacultyLayout>
-      <div className="px-8 py-8 max-w-5xl">
+      <div className="p-4 sm:p-6 md:p-8 max-w-5xl">
         <div className="mb-6">
           <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
             {INSTITUTION.name}
@@ -167,14 +167,14 @@ const AcademicStructurePage = () => {
           </div>
           {isAdmin && (
             <form onSubmit={handleAddDept} className="px-5 py-4 border-t border-slate-800 bg-slate-800/30">
-              <div className="flex items-end gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-end gap-3">
                 <div className="flex-1">
                   <label className="text-xs text-slate-400 mb-1 block">Department Name</label>
                   <input value={deptForm.name} onChange={e => setDeptForm(p => ({ ...p, name: e.target.value }))}
                     placeholder="e.g. Computer Engineering"
                     className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500" />
                 </div>
-                <div className="w-28">
+                <div className="w-full sm:w-28">
                   <label className="text-xs text-slate-400 mb-1 block">Code</label>
                   <input value={deptForm.code} onChange={e => setDeptForm(p => ({ ...p, code: e.target.value }))}
                     placeholder="CE"
@@ -207,7 +207,7 @@ const AcademicStructurePage = () => {
           </div>
           {isAdmin && (
             <form onSubmit={handleAddCourse} className="px-5 py-4 border-t border-slate-800 bg-slate-800/30">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
                 <div className="col-span-2">
                   <label className="text-xs text-slate-400 mb-1 block">Course Name</label>
                   <input value={courseForm.name} onChange={e => setCourseForm(p => ({ ...p, name: e.target.value }))}
@@ -229,7 +229,7 @@ const AcademicStructurePage = () => {
                   </select>
                 </div>
                 <button type="submit" disabled={courseLoading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded-lg transition-colors col-span-2 md:col-span-1">
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded-lg transition-colors sm:col-span-2 md:col-span-1">
                   Add Course
                 </button>
               </div>
@@ -257,7 +257,7 @@ const AcademicStructurePage = () => {
           </div>
           {isAdmin && (
             <form onSubmit={handleAddSemester} className="px-5 py-4 border-t border-slate-800 bg-slate-800/30">
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
                 <div>
                   <label className="text-xs text-slate-400 mb-1 block">Semester No.</label>
                   <select value={semForm.semesterNumber} onChange={e => setSemForm(p => ({ ...p, semesterNumber: Number(e.target.value) }))}
@@ -291,7 +291,7 @@ const AcademicStructurePage = () => {
                   </select>
                 </div>
                 <button type="submit" disabled={semLoading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded-lg transition-colors">
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded-lg transition-colors sm:col-span-2 md:col-span-1">
                   Add Semester
                 </button>
               </div>
@@ -318,7 +318,7 @@ const AcademicStructurePage = () => {
           </div>
           {isAdmin && (
             <form onSubmit={handleAddDivision} className="px-5 py-4 border-t border-slate-800 bg-slate-800/30">
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
                 <div>
                   <label className="text-xs text-slate-400 mb-1 block">Division Name</label>
                   <input value={divForm.name} onChange={e => setDivForm(p => ({ ...p, name: e.target.value.toUpperCase() }))}
@@ -358,7 +358,7 @@ const AcademicStructurePage = () => {
                   </select>
                 </div>
                 <button type="submit" disabled={divLoading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded-lg transition-colors">
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded-lg transition-colors sm:col-span-2 md:col-span-3 lg:col-span-1">
                   Add Division
                 </button>
               </div>

@@ -131,7 +131,7 @@ const FacultyGalleryPage = () => {
 
   return (
     <FacultyLayout>
-      <div className="px-8 py-8">
+      <div className="p-4 sm:p-6 md:p-8 max-w-7xl">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
@@ -373,7 +373,7 @@ const FacultyGalleryPage = () => {
         {/* ─── MODAL: INSPECT SUBMISSION DETAILS ───────────────────────────── */}
         {selectedItem && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-blue-950 text-blue-400 border border-blue-900">
@@ -460,12 +460,12 @@ const FacultyGalleryPage = () => {
                 {selectedItem.description}
               </div>
 
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+              <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="text-xs text-slate-400">
                   Submitted by: <strong className="text-slate-200">{selectedItem.studentName}</strong>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {selectedItem.status !== 'Approved' && (
                     <button
                       onClick={() => handleApprove(selectedItem)}
@@ -496,7 +496,7 @@ const FacultyGalleryPage = () => {
         {/* ─── MODAL: REJECT SUBMISSION WITH REASON ───────────────────────── */}
         {rejectingItem && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 className="text-base font-bold text-white">Provide Rejection Feedback</h3>
                 <button onClick={() => setRejectingItem(null)} className="text-slate-400 hover:text-white">✕</button>

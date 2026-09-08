@@ -47,8 +47,8 @@ const FacultyListPage = () => {
 
   return (
     <FacultyLayout>
-      <div className="px-8 py-8">
-        <div className="flex items-center justify-between mb-6">
+      <div className="p-4 sm:p-6 md:p-8 max-w-7xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
               {INSTITUTION.name} • {ACADEMIC_CONFIG.DEPARTMENT.name}
@@ -60,7 +60,7 @@ const FacultyListPage = () => {
             <button
               id="add-faculty-btn"
               onClick={() => navigate('/faculty/faculty/new')}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+              className="self-start sm:self-auto px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-blue-600/20"
             >
               + Add Faculty
             </button>

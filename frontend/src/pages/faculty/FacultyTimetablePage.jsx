@@ -228,7 +228,7 @@ const FacultyTimetablePage = () => {
 
   return (
     <FacultyLayout>
-      <div className="px-8 py-8">
+      <div className="p-4 sm:p-6 md:p-8 max-w-7xl">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
@@ -624,7 +624,7 @@ const FacultyTimetablePage = () => {
         {/* ─── MODAL: ADD TIMETABLE SLOT ─────────────────────────────────────── */}
         {showAddSlot && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
                 <h3 className="text-lg font-bold text-white">Add Weekly Timetable Slot</h3>
                 <button onClick={() => setShowAddSlot(false)} className="text-slate-400 hover:text-white" aria-label="Close">
@@ -750,7 +750,7 @@ const FacultyTimetablePage = () => {
         {/* ─── MODAL: DECLARE HOLIDAY ─────────────────────────────────────────── */}
         {showAddHoliday && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
                 <h3 className="text-lg font-bold text-white">Declare Academic Holiday</h3>
                 <button onClick={() => setShowAddHoliday(false)} className="text-slate-400 hover:text-white" aria-label="Close">
@@ -820,7 +820,7 @@ const FacultyTimetablePage = () => {
         {/* ─── MODAL: MANUAL RESCHEDULE ──────────────────────────────────────── */}
         {selectedLectureForReschedule && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
                 <div>
                   <h3 className="text-lg font-bold text-white">Manual Lecture Reschedule</h3>

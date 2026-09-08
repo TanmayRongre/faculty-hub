@@ -79,7 +79,7 @@ const StudentNoticesPage = () => {
     <div className="min-h-screen bg-slate-950 text-white">
       {/* Top Navbar */}
       <header className="border-b border-slate-800 bg-slate-900 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/student/dashboard')}
@@ -103,7 +103,7 @@ const StudentNoticesPage = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
@@ -282,7 +282,7 @@ const StudentNoticesPage = () => {
         {/* ─── MODAL: NOTICE DETAILS ────────────────────────────────────────── */}
         {selectedNotice && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
                   <span

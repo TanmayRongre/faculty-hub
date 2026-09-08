@@ -55,10 +55,10 @@ const StudentDetailPage = () => {
 
   return (
     <FacultyLayout>
-      <div className="px-8 py-8 max-w-5xl">
+      <div className="p-4 sm:p-6 md:p-8 max-w-5xl">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button
               onClick={() => navigate('/faculty/students')}
               className="text-slate-400 hover:text-white transition-colors text-sm"
@@ -73,7 +73,7 @@ const StudentDetailPage = () => {
             <button
               id="edit-student-btn"
               onClick={() => navigate(`/faculty/students/${id}/edit`)}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm rounded-lg border border-slate-700 transition-colors"
+              className="self-start sm:self-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm rounded-lg border border-slate-700 transition-colors"
             >
               Edit
             </button>
@@ -81,9 +81,9 @@ const StudentDetailPage = () => {
         </div>
 
         {/* Basic Info */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 mb-4">
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Basic Information</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
             <InfoRow label="Full Name" value={student.fullName} />
             <InfoRow label="Roll Number" value={student.rollNumber} />
             <InfoRow label="Enrollment Number" value={student.enrollmentNumber} />
@@ -94,9 +94,9 @@ const StudentDetailPage = () => {
         </div>
 
         {/* Academic Info */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 mb-4">
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Academic Information</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
             <InfoRow label="Department" value={ACADEMIC_CONFIG.DEPARTMENT.name} />
             <InfoRow label="Semester" value={ACADEMIC_CONFIG.SEMESTER.displayName} />
             <InfoRow label="Academic Year" value={student.academicYear || '2026-2027'} />

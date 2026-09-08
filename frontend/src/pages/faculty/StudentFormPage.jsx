@@ -134,7 +134,7 @@ const StudentFormPage = () => {
 
   return (
     <FacultyLayout>
-      <div className="max-w-3xl px-8 py-8">
+      <div className="max-w-3xl p-4 sm:p-6 md:p-8">
         <div className="mb-6">
           <button
             onClick={() => navigate('/faculty/students')}

@@ -149,25 +149,25 @@ const AttendancePage = () => {
 
   return (
     <FacultyLayout>
-      <div className="px-8 py-8">
+      <div className="p-4 sm:p-6 md:p-8 max-w-full">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
               {INSTITUTION.name} • {ACADEMIC_CONFIG.DEPARTMENT.name}
             </div>
-            <h1 className="text-2xl font-bold text-white">Attendance Management Matrix</h1>
-            <p className="text-slate-400 mt-1 text-sm">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Attendance Management Matrix</h1>
+            <p className="text-slate-400 mt-1 text-xs sm:text-sm">
               Session-by-session matrix view for {ACADEMIC_CONFIG.SEMESTER.displayName}. All students default to <span className="text-emerald-400 font-semibold">Present</span>.
             </p>
           </div>
 
           {/* Actions: Refresh & Take Attendance */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
             <button
               onClick={loadMatrix}
               disabled={loading}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium border border-slate-700 transition-all flex items-center gap-2"
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-medium border border-slate-700 transition-all flex items-center gap-2"
             >
               <RefreshCw size={15} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
               <span>Refresh</span>
@@ -175,7 +175,7 @@ const AttendancePage = () => {
 
             <button
               onClick={openMarkModal}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-900/30 transition-all flex items-center gap-2"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-900/30 transition-all flex items-center gap-2"
             >
               <Plus size={16} aria-hidden="true" />
               <span>Take Attendance</span>
@@ -184,8 +184,8 @@ const AttendancePage = () => {
         </div>
 
         {/* Tab & Controls Bar */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-6 space-y-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4 mb-6 space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             {/* Subject Selector Tabs */}
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-semibold text-slate-400 uppercase mr-1">Subject:</span>
@@ -444,19 +444,19 @@ const AttendancePage = () => {
 
         {/* ─── MODAL: FAST ATTENDANCE RECORDING ─────────────────────────────── */}
         {showMarkModal && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl max-h-[90vh] flex flex-col">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl max-h-[96vh] flex flex-col">
               {/* Modal Header */}
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
                 <div>
-                  <h3 className="text-lg font-bold text-white">Fast Attendance Marking</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <h3 className="text-base sm:text-lg font-bold text-white">Fast Attendance Marking</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
                     Click students who are <span className="text-red-400 font-bold">ABSENT</span>. Everyone is <span className="text-emerald-400 font-bold">Present</span> by default.
                   </p>
                 </div>
                 <button
                   onClick={() => setShowMarkModal(false)}
-                  className="text-slate-400 hover:text-white"
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
                   aria-label="Close"
                 >
                   <X size={18} aria-hidden="true" />
@@ -465,24 +465,24 @@ const AttendancePage = () => {
 
               {/* Form Controls */}
               <form onSubmit={handleAttendanceSubmit} className="flex-1 flex flex-col min-h-0">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-3">
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1 font-medium">Session Date *</label>
+                    <label className="block text-[11px] sm:text-xs text-slate-400 mb-1 font-medium">Session Date *</label>
                     <input
                       type="date"
                       value={markDate}
                       onChange={(e) => setMarkDate(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1 font-medium">Subject *</label>
+                    <label className="block text-[11px] sm:text-xs text-slate-400 mb-1 font-medium">Subject *</label>
                     <select
                       value={markSubject}
                       onChange={(e) => setMarkSubject(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
                     >
                       {ACADEMIC_CONFIG.SUBJECTS.map((s) => (
                         <option key={s.code} value={s.code}>
@@ -493,34 +493,34 @@ const AttendancePage = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1 font-medium">Time / Slot</label>
+                    <label className="block text-[11px] sm:text-xs text-slate-400 mb-1 font-medium">Time / Slot</label>
                     <input
                       type="text"
                       value={markSlot}
                       onChange={(e) => setMarkSlot(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
                       placeholder="e.g. 10:00 - 11:00"
                     />
                   </div>
                 </div>
 
                 {/* Quick Toggle Buttons */}
-                <div className="flex items-center justify-between mb-3 text-xs">
-                  <div className="text-slate-400">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 text-xs">
+                  <div className="text-slate-400 text-[11px] sm:text-xs">
                     Present: <strong className="text-emerald-400 font-mono">{rosterStudents.length - absentEnrollments.size}</strong> | Absent: <strong className="text-red-400 font-mono">{absentEnrollments.size}</strong>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={markAllPresent}
-                      className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px]"
+                      className="flex-1 sm:flex-none px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px]"
                     >
                       Reset All Present
                     </button>
                     <button
                       type="button"
                       onClick={markAllAbsent}
-                      className="px-2.5 py-1 rounded bg-red-950/40 hover:bg-red-900/50 text-red-400 border border-red-800/40 text-[11px]"
+                      className="flex-1 sm:flex-none px-2.5 py-1 rounded bg-red-950/40 hover:bg-red-900/50 text-red-400 border border-red-800/40 text-[11px]"
                     >
                       Mark All Absent
                     </button>
@@ -528,7 +528,7 @@ const AttendancePage = () => {
                 </div>
 
                 {/* Student Clickable Roster */}
-                <div className="flex-1 overflow-y-auto border border-slate-800 rounded-xl p-3 bg-slate-950/50 grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+                <div className="flex-1 overflow-y-auto border border-slate-800 rounded-xl p-2 sm:p-3 bg-slate-950/50 grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
                   {rosterStudents.map((student) => {
                     const isAbsent = absentEnrollments.has(student.enrollmentNumber);
                     return (

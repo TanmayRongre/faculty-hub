@@ -18,6 +18,7 @@ import {
   syncAllStudents,
 } from '../../services/sheetsService';
 import { INSTITUTION } from '../../config/institution';
+import FacultyLayout from './FacultyLayout';
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -107,11 +108,12 @@ export default function SheetsStatusPage() {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#0d1117] text-white p-6 md:p-10">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <FacultyLayout>
+      <div className="p-4 sm:p-6 md:p-8 max-w-5xl">
+        <div className="space-y-8">
 
         {/* Header */}
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
             <div className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">
               {INSTITUTION.name}
@@ -344,7 +346,8 @@ export default function SheetsStatusPage() {
           </p>
         </div>
 
+        </div>
       </div>
-    </div>
+    </FacultyLayout>
   );
 }

@@ -54,9 +54,9 @@ const FacultyDetailPage = () => {
 
   return (
     <FacultyLayout>
-      <div className="px-8 py-8 max-w-4xl">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
+      <div className="p-4 sm:p-6 md:p-8 max-w-4xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button onClick={() => navigate('/faculty/faculty')} className="text-slate-400 hover:text-white text-sm">
               ← Faculty Directory
             </button>
@@ -67,16 +67,16 @@ const FacultyDetailPage = () => {
           {isAdmin && (
             <button
               onClick={() => navigate(`/faculty/faculty/${id}/edit`)}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm rounded-lg border border-slate-700 transition-colors"
+              className="self-start sm:self-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm rounded-lg border border-slate-700 transition-colors"
             >
               Edit
             </button>
           )}
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 mb-4">
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Faculty Profile</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
             <InfoRow label="Full Name" value={faculty.fullName} />
             <InfoRow label="Email" value={faculty.email} />
             <InfoRow label="Phone" value={faculty.phone} />

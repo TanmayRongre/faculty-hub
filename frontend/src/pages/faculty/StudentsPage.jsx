@@ -66,9 +66,9 @@ const StudentsPage = () => {
 
   return (
     <FacultyLayout>
-      <div className="px-8 py-8">
+      <div className="p-4 sm:p-6 md:p-8 max-w-7xl">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
               {INSTITUTION.name} • {ACADEMIC_CONFIG.DEPARTMENT.name}
@@ -82,7 +82,7 @@ const StudentsPage = () => {
             <button
               id="add-student-btn"
               onClick={() => navigate('/faculty/students/new')}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+              className="self-start sm:self-auto px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-blue-600/20"
             >
               + Add Student
             </button>
@@ -90,14 +90,14 @@ const StudentsPage = () => {
         </div>
 
         {/* Filters */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
           <input
             id="student-search"
             type="text"
             placeholder="Search name, roll no, enrollment number..."
             value={search}
             onChange={handleSearch}
-            className="flex-1 max-w-md px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500"
+            className="w-full sm:max-w-md px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500"
           />
 
           <select
@@ -106,7 +106,7 @@ const StudentsPage = () => {
               setFilterStatus(e.target.value);
               setPage(1);
             }}
-            className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-blue-500"
+            className="w-full sm:w-auto px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-blue-500"
           >
             <option value="">All Statuses</option>
             <option value="active">Active</option>

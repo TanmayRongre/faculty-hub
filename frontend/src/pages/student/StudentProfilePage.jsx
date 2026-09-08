@@ -72,13 +72,17 @@ const StudentProfilePage = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       {/* Header */}
-      <header className="border-b border-slate-800 bg-slate-900">
-        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+      <header className="border-b border-slate-800 bg-slate-900 sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center font-bold text-white text-sm">
-              FH
-            </div>
-            <span className="font-semibold text-white">FacultyHub</span>
+            <button
+              onClick={() => navigate('/student/dashboard')}
+              className="text-slate-400 hover:text-white transition-colors text-sm"
+            >
+              ← Dashboard
+            </button>
+            <span className="text-slate-700">|</span>
+            <span className="font-semibold text-white">My Profile</span>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-slate-400">{user?.name}</span>
@@ -93,7 +97,7 @@ const StudentProfilePage = () => {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
@@ -112,9 +116,9 @@ const StudentProfilePage = () => {
             {profile ? (
               <>
                 {/* Basic info */}
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-4">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 mb-4">
                   <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Basic Information</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     <InfoCard label="Full Name" value={profile.fullName} />
                     <InfoCard label="Roll Number" value={profile.rollNumber} />
                     <InfoCard label="Enrollment" value={profile.enrollmentNumber} />
@@ -124,9 +128,9 @@ const StudentProfilePage = () => {
                 </div>
 
                 {/* Academic info */}
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-4">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 mb-4">
                   <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Academic Information</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     <InfoCard label="Institution" value={INSTITUTION.name} />
                     <InfoCard label="Department" value={ACADEMIC_CONFIG.DEPARTMENT.name} />
                     <InfoCard label="Semester" value={ACADEMIC_CONFIG.SEMESTER.displayName} />
