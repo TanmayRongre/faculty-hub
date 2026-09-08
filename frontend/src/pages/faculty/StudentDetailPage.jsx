@@ -87,8 +87,9 @@ const StudentDetailPage = () => {
             <InfoRow label="Full Name" value={student.fullName} />
             <InfoRow label="Roll Number" value={student.rollNumber} />
             <InfoRow label="Enrollment Number" value={student.enrollmentNumber} />
-            <InfoRow label="Email" value={student.email} />
-            <InfoRow label="Phone" value={student.phone} />
+            <InfoRow label="Exam Seat No." value={student.examSeatNumber || 'Not assigned'} />
+            <InfoRow label="Practical Batch" value={student.batch ? `Batch ${student.batch}` : 'Not assigned'} />
+            {student.phone && <InfoRow label="Phone" value={student.phone} />}
           </div>
         </div>
 

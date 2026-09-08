@@ -41,13 +41,37 @@ async function resolveSubject(subjectCode) {
   return subject;
 }
 
-async function getStudentsForClass({ semester = 5, division } = {}) {
+async function getStudentsForClass({ semester = 5, division, batch } = {}) {
   const query = { status: 'active' };
   if (semester) query.semester = Number(semester);
-  if (division) query.division = division.toUpperCase();
+
+  // In 5th semester Computer Engineering, all 68 students share a single common class.
+  // Only filter by division if students in the DB actually have division populated.
+  if (division && division !== 'COMMON' && division !== 'ALL') {
+    const hasDivision = await Student.exists({
+      status: 'active',
+      semester: Number(semester),
+      division: division.toUpperCase(),
+    });
+    if (hasDivision) {
+      query.division = division.toUpperCase();
+    }
+  }
+
+  if (batch) {
+    const hasBatch = await Student.exists({
+      status: 'active',
+      semester: Number(semester),
+      batch: batch.toUpperCase(),
+    });
+    if (hasBatch) {
+      query.batch = batch.toUpperCase();
+    }
+  }
 
   const students = await Student.find(query)
-    .select('enrollmentNumber rollNumber fullName semester division')
+    .select('enrollmentNumber rollNumber fullName semester division batch')
+    .collation({ locale: 'en', numericOrdering: true })
     .sort({ rollNumber: 1 })
     .lean();
   return students;
@@ -113,47 +137,44 @@ async function submitAttendance(params) {
 async function updateAttendance(params) {
   const { lectureId, absentEnrollments = [] } = params;
 
-  const allRows = await academicDataService.getAllAttendance({});
-  const lectureRows = allRows.filter((r) => r.lectureId === lectureId);
+  const lectureRows = await academicDataService.getAllAttendance({ lectureId });
   if (lectureRows.length === 0) {
     const err = new Error(`No attendance found for lectureId: ${lectureId}`);
     err.statusCode = 404;
     throw err;
   }
 
+  const subjectCode = lectureRows[0].subjectCode;
+  const date = lectureRows[0].date;
   const absentSet = new Set(absentEnrollments.map((e) => e.toUpperCase()));
-  const updatedRecords = allRows.map((r) => {
-    if (r.lectureId === lectureId) {
-      const status = absentSet.has(r.enrollmentNumber.toUpperCase()) ? 'Absent' : 'Present';
-      return { ...r, status };
-    }
-    return r;
+
+  const studentAttendanceList = lectureRows.map((r) => {
+    const isAbsent =
+      absentSet.has((r.enrollmentNumber || '').toUpperCase()) ||
+      absentSet.has(String(r.rollNumber || '').toUpperCase());
+    return {
+      rollNumber: r.rollNumber,
+      enrollmentNumber: r.enrollmentNumber,
+      status: isAbsent ? 'Absent' : 'Present',
+    };
   });
 
-  await rewriteAttendanceSheet(updatedRecords);
+  await academicDataService.updateSubjectAttendance(subjectCode, lectureId, date, studentAttendanceList);
 
-  const presentCount = updatedRecords.filter((r) => r.lectureId === lectureId && r.status === 'Present').length;
-  const absentCount = updatedRecords.filter((r) => r.lectureId === lectureId && r.status === 'Absent').length;
+  const presentCount = studentAttendanceList.filter((r) => r.status === 'Present').length;
+  const absentCount = studentAttendanceList.filter((r) => r.status === 'Absent').length;
 
   return {
     lectureId,
     action: 'updated',
-    saved: lectureRows.length,
+    saved: studentAttendanceList.length,
     present: presentCount,
     absent: absentCount,
   };
 }
 
 async function rewriteAttendanceSheet(records) {
-  const sheets = require('../../integrations/googleSheets/googleSheetsService');
-  const { SHEET_NAMES, HEADERS } = require('../../integrations/googleSheets/spreadsheetConfig');
-  const { attendanceRecordToRow } = require('../../integrations/googleSheets/mappers');
-
-  const headerRow = HEADERS.ATTENDANCE;
-  const dataRows = records.map(attendanceRecordToRow);
-
-  await sheets.clearSheet(SHEET_NAMES.ATTENDANCE);
-  await sheets.appendRows(SHEET_NAMES.ATTENDANCE, [headerRow, ...dataRows]);
+  await academicDataService.writeAttendanceBatch(records);
 }
 
 async function getLectureAttendance(lectureId) {
@@ -223,7 +244,8 @@ async function getDefaulters(filters = {}) {
 async function getAttendanceMatrix(filters = {}) {
   const sem = filters.semester ? Number(filters.semester) : 5;
   const students = await Student.find({ status: 'active', semester: sem })
-    .select('enrollmentNumber rollNumber fullName')
+    .select('enrollmentNumber rollNumber fullName batch')
+    .collation({ locale: 'en', numericOrdering: true })
     .sort({ rollNumber: 1 })
     .lean();
 

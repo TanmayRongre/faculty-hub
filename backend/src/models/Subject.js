@@ -13,22 +13,24 @@ const subjectSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Subject name is required'],
       trim: true,
-      maxlength: [150, 'Subject name too long'],
+      maxlength: [200, 'Subject name too long'],
+    },
+    // Official MSBTE course code (e.g. 315323 for STE)
+    courseCode: {
+      type: String,
+      trim: true,
+      default: null,
     },
     department: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Department',
       required: [true, 'Department is required'],
     },
-    course: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Course',
-      default: null,
-    },
     semester: {
       type: Number,
       default: 5,
     },
+    // Faculty assigned to this subject (optional — linked when faculty records exist)
     assignedFaculty: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Faculty',

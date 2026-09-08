@@ -337,26 +337,65 @@ async function seedAcademicData() {
   if (isSheetsConfigured) {
     console.log('\n[Google Sheets] Synchronizing with Google Spreadsheet...');
     try {
-      // 1. Ensure Worksheets exist
-      await sheetsService.ensureWorksheet(SHEET_NAMES.STUDENTS, HEADERS[SHEET_NAMES.STUDENTS]);
-      await sheetsService.ensureWorksheet(SHEET_NAMES.MARKS, HEADERS[SHEET_NAMES.MARKS]);
-      await sheetsService.ensureWorksheet(SHEET_NAMES.ATTENDANCE, HEADERS[SHEET_NAMES.ATTENDANCE]);
+      // 1. Ensure Students Sheet exists with Row 1 headers
+      await sheetsService.ensureWorksheet(SHEET_NAMES.STUDENTS, HEADERS.STUDENTS);
 
       // 2. Students Sheet
       const studentRows = seededStudents.map((s) => studentRecordToRow(s));
-      await sheetsService.clearRange(`${SHEET_NAMES.STUDENTS}!A2:K500`);
-      await sheetsService.appendRows(SHEET_NAMES.STUDENTS, studentRows);
+      await sheetsService.clearRange(`${SHEET_NAMES.STUDENTS}!A2:Z1000`);
+      await sheetsService.updateRange(`${SHEET_NAMES.STUDENTS}!A2`, studentRows);
       console.log(`  ✓ Synced ${studentRows.length} students to Google Sheets.`);
 
-      // 3. Marks Sheet
-      await sheetsService.clearRange(`${SHEET_NAMES.MARKS}!A2:J500`);
-      await sheetsService.appendRows(SHEET_NAMES.MARKS, marksRows);
-      console.log(`  ✓ Synced ${marksRows.length} marks to Google Sheets.`);
+      // 3. Subject-Wise Marks Worksheets (MARK_STE, MARK_ACN, MARK_OSY, MARK_SPI, MARK_ITR, MARK_ENDS)
+      const { VALID_SUBJECTS } = require('../integrations/googleSheets/spreadsheetConfig');
+      for (const sub of VALID_SUBJECTS) {
+        await sheetsService.ensureMarksWorksheet(sub, seededStudents);
+      }
 
-      // 4. Attendance Sheet
-      await sheetsService.clearRange(`${SHEET_NAMES.ATTENDANCE}!A2:L2000`);
-      await sheetsService.appendRows(SHEET_NAMES.ATTENDANCE, attendanceRows);
-      console.log(`  ✓ Synced ${attendanceRows.length} attendance rows to Google Sheets.`);
+      // Group marksRows by subjectCode and update each MARK_<SUBJECT> sheet
+      const marksBySubject = {};
+      for (const row of marksRows) {
+        const sub = row[2]; // subjectCode
+        if (!marksBySubject[sub]) marksBySubject[sub] = [];
+        marksBySubject[sub].push({
+          rollNumber: row[1],
+          enrollmentNumber: row[0],
+          PA: row[4],
+        });
+      }
+
+      for (const [sub, mList] of Object.entries(marksBySubject)) {
+        if (!VALID_SUBJECTS.includes(sub)) continue;
+        await sheetsService.updateSubjectMarks(sub, mList);
+      }
+      console.log(`  ✓ Synced marks across all active MARK_<SUBJECT> worksheets.`);
+
+      // 4. Subject-Wise Attendance Worksheets (ATT_STE, ATT_ACN, ATT_OSY, ATT_SPI, ATT_ITR, ATT_ENDS)
+      for (const sub of VALID_SUBJECTS) {
+        await sheetsService.ensureAttendanceWorksheet(sub, seededStudents);
+      }
+
+      // Group attendanceRows by subjectCode and lecture session
+      const bySubject = {};
+      for (const r of attendanceRows) {
+        const sub = r[2]; // subjectCode
+        if (!bySubject[sub]) bySubject[sub] = [];
+        bySubject[sub].push(r);
+      }
+
+      for (const [sub, subRows] of Object.entries(bySubject)) {
+        if (!VALID_SUBJECTS.includes(sub)) continue;
+        const byDate = {};
+        for (const row of subRows) {
+          const d = row[0]; // date
+          if (!byDate[d]) byDate[d] = [];
+          byDate[d].push({ rollNumber: row[4], status: row[5] });
+        }
+        for (const [d, list] of Object.entries(byDate)) {
+          await sheetsService.updateSubjectAttendance(sub, `${d.replace(/-/g, '')}-${sub}-A-1`, d, list);
+        }
+      }
+      console.log(`  ✓ Synced attendance sessions across all active ATT_<SUBJECT> worksheets.`);
     } catch (sheetErr) {
       console.warn('  ⚠️ Google Sheets sync encountered an issue (using local cache):', sheetErr.message);
     }

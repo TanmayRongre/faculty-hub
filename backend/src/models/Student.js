@@ -24,29 +24,36 @@ const studentSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Full name is required'],
       trim: true,
-      maxlength: [100, 'Name too long'],
+      maxlength: [150, 'Name too long'],
     },
+    // Email is optional — real student emails not provided
     email: {
       type: String,
-      required: [true, 'Email is required'],
       lowercase: true,
       trim: true,
-      match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email'],
+      default: null,
     },
     phone: {
       type: String,
       trim: true,
-      match: [/^[0-9+\-\s()]{7,15}$/, 'Please enter a valid phone number'],
+      default: null,
+    },
+    // Exam Seat No — provided by institution; null until assigned
+    examSeatNumber: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    // Practical batch (A, B, C) — null until batch list is provided
+    batch: {
+      type: String,
+      enum: ['A', 'B', 'C', null],
+      default: null,
     },
     department: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Department',
       required: [true, 'Department is required'],
-    },
-    course: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Course',
-      default: null,
     },
     semester: {
       type: Number,
@@ -56,16 +63,6 @@ const studentSchema = new mongoose.Schema(
       type: String,
       default: '2026-2027',
       trim: true,
-    },
-    division: {
-      type: String,
-      default: 'A',
-      trim: true,
-      uppercase: true,
-    },
-    admissionYear: {
-      type: Number,
-      default: null,
     },
     status: {
       type: String,
@@ -81,6 +78,7 @@ studentSchema.index({ rollNumber: 1 });
 studentSchema.index({ department: 1 });
 studentSchema.index({ semester: 1 });
 studentSchema.index({ status: 1 });
+studentSchema.index({ batch: 1 });
 studentSchema.index({ fullName: 'text', enrollmentNumber: 'text', rollNumber: 'text' });
 
 module.exports = mongoose.model('Student', studentSchema);

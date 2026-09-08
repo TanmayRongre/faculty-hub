@@ -29,6 +29,8 @@ const StudentFormPage = () => {
     fullName: '',
     email: '',
     phone: '',
+    examSeatNumber: '',
+    batch: '',
     department: '',
     semester: 5,
     academicYear: '2026-2027',
@@ -60,6 +62,8 @@ const StudentFormPage = () => {
           fullName: s.fullName || '',
           email: s.email || '',
           phone: s.phone || '',
+          examSeatNumber: s.examSeatNumber || '',
+          batch: s.batch || '',
           department: s.department?._id || '',
           semester: s.semester || 5,
           academicYear: s.academicYear || '2026-2027',
@@ -75,8 +79,8 @@ const StudentFormPage = () => {
     if (!form.enrollmentNumber.trim()) errs.enrollmentNumber = 'Enrollment number is required';
     if (!form.rollNumber.trim()) errs.rollNumber = 'Roll number is required';
     if (!form.fullName.trim()) errs.fullName = 'Full name is required';
-    if (!form.email) errs.email = 'Email is required';
-    else if (!/^\S+@\S+\.\S+$/.test(form.email)) errs.email = 'Invalid email';
+    // Email is optional for CE students
+    if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) errs.email = 'Invalid email format';
     return errs;
   };
 
@@ -183,7 +187,7 @@ const StudentFormPage = () => {
                   id="enrollmentNumber"
                   name="enrollmentNumber"
                   type="text"
-                  placeholder="e.g. EN230101"
+                  placeholder="e.g. 24410360142"
                   value={form.enrollmentNumber}
                   onChange={handleChange}
                   disabled={isEdit}
@@ -191,30 +195,58 @@ const StudentFormPage = () => {
                 />
               </FormField>
 
-              <FormField label="Email Address *" error={errors.email}>
+              <FormField label="Exam Seat No. (optional)" error={errors.examSeatNumber}>
                 <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="student@example.com"
-                  value={form.email}
+                  id="examSeatNumber"
+                  name="examSeatNumber"
+                  type="text"
+                  placeholder="Leave blank — not yet provided"
+                  value={form.examSeatNumber}
                   onChange={handleChange}
-                  className={inputClass(errors.email)}
+                  className={inputClass(errors.examSeatNumber)}
                 />
               </FormField>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Phone Number" error={errors.phone}>
+              <FormField label="Email Address (optional)" error={errors.email}>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="Optional — leave blank if not available"
+                  value={form.email}
+                  onChange={handleChange}
+                  className={inputClass(errors.email)}
+                />
+              </FormField>
+
+              <FormField label="Phone Number (optional)" error={errors.phone}>
                 <input
                   id="phone"
                   name="phone"
                   type="text"
-                  placeholder="e.g. +91 98765 43210"
+                  placeholder="Optional"
                   value={form.phone}
                   onChange={handleChange}
                   className={inputClass(errors.phone)}
                 />
+              </FormField>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField label="Practical Batch">
+                <select
+                  name="batch"
+                  value={form.batch}
+                  onChange={handleChange}
+                  className={inputClass()}
+                >
+                  <option value="">Not assigned yet</option>
+                  <option value="A">Batch A</option>
+                  <option value="B">Batch B</option>
+                  <option value="C">Batch C</option>
+                </select>
               </FormField>
 
               <FormField label="Academic Status">

@@ -12,8 +12,11 @@ const router = express.Router();
 const studentCreateValidation = [
   body('enrollmentNumber').trim().notEmpty().withMessage('Enrollment number is required'),
   body('rollNumber').trim().notEmpty().withMessage('Roll number is required'),
-  body('fullName').trim().notEmpty().withMessage('Full name is required').isLength({ max: 100 }),
-  body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
+  body('fullName').trim().notEmpty().withMessage('Full name is required').isLength({ max: 150 }),
+  body('email').optional({ nullable: true, checkFalsy: true }).isEmail().withMessage('Invalid email format').normalizeEmail(),
+  body('phone').optional({ nullable: true, checkFalsy: true }).trim(),
+  body('examSeatNumber').optional({ nullable: true, checkFalsy: true }).trim(),
+  body('batch').optional({ nullable: true, checkFalsy: true }).isIn(['A', 'B', 'C', '']),
   body('department').optional().isMongoId(),
   body('semester').optional().isInt({ min: 1, max: 8 }),
   body('academicYear').optional().matches(/^\d{4}-\d{4}$/),

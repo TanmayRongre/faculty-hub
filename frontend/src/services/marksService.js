@@ -16,6 +16,12 @@ export async function getMyMarks({ semester, academicYear, subjectCode } = {}) {
   return res.data;
 }
 
+/** Faculty/admin: get full student roster with marks for a specific subject */
+export async function getSubjectMarks(subjectCode) {
+  const res = await api.get(`/marks/subject/${encodeURIComponent(subjectCode)}`);
+  return res.data;
+}
+
 /** Faculty/admin: get a specific student's marks */
 export async function getStudentMarks(studentId, { semester, academicYear, subjectCode } = {}) {
   const params = {};
@@ -38,9 +44,6 @@ export async function getAllMarks({ semester, academicYear, subjectCode } = {}) 
 
 /**
  * Faculty/admin: update marks for a student+subject.
- * @param {string} studentId
- * @param {string} subjectCode
- * @param {{ PA: number|null, academicYear?: string, semester?: number }} data
  */
 export async function updateMarks(studentId, subjectCode, data) {
   const res = await api.put(`/marks/${studentId}/${encodeURIComponent(subjectCode)}`, data);
@@ -48,12 +51,22 @@ export async function updateMarks(studentId, subjectCode, data) {
 }
 
 /**
- * Faculty/admin: bulk save all marks in one operation.
- * @param {Array<{ enrollmentNumber: string, subjectCode: string, PA: number|null }>} marks
- * @param {string} [academicYear='2026-2027']
- * @param {number} [semester=5]
+ * Faculty/admin: SAVE ALL - bulk save all student marks for a subject in one atomic operation.
+ * @param {object} payload
+ * @param {string} payload.subject  - e.g. "STE", "OSY", "ACN"
+ * @param {Array<{ rollNo: string|number, pa1: number|null, pa2: number|null }>} payload.marks
+ * @param {string} [payload.academicYear='2026-2027']
+ * @param {number} [payload.semester=5]
  */
-export async function bulkUpdateMarks(marks, academicYear = '2026-2027', semester = 5) {
-  const res = await api.put('/marks/bulk', { marks, academicYear, semester });
+export async function bulkUpdateMarks({ subject, marks, academicYear = '2026-2027', semester = 5 }) {
+  const res = await api.put('/marks/batch', { subject, marks, academicYear, semester });
+  return res.data;
+}
+
+/**
+ * Admin: reset all marks records
+ */
+export async function resetMarks() {
+  const res = await api.post('/marks/reset');
   return res.data;
 }

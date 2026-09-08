@@ -1,17 +1,14 @@
 /**
- * seed.js — Development-only script to bootstrap initial accounts and academic structure.
+ * seed.js — Script to bootstrap admin account and academic structure.
  *
  * Scope:
- *  - Department: Computer Science (CO)
- *  - Semester: 5th Semester (5)
- *  - 4 Faculty accounts:
- *      * HOD: Prof. Anand Deshmukh (hod@facultyhub.dev)
- *      * Permanent Faculty: Prof. Rajesh Patil (faculty@facultyhub.dev)
- *      * Normal Faculty: Prof. Sneha Kulkarni (faculty2@facultyhub.dev)
- *      * NCC Administrator: Prof. Vikram Joshi (ncc@facultyhub.dev)
+ *  - Department: Computer Engineering (CE)
+ *  - Semester: 5th Semester
  *  - 6 Subjects: STE, ACN, OSY, SPI, ITR, ENDS
  *  - Admin User: admin@facultyhub.dev
- *  - Student User: student@facultyhub.dev (Roll 01)
+ *
+ * NOTE: Students are seeded by resetAndSeed.js — do NOT add demo students here.
+ * NOTE: Faculty are added manually when actual faculty information is provided.
  */
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 const mongoose = require('mongoose');
@@ -163,46 +160,8 @@ async function seed() {
     }
   }
 
-  // 5. Seed Primary Demo Student User & Profile (Roll 01)
-  let studentUser = await User.findOne({ email: 'student@facultyhub.dev' });
-  if (!studentUser) {
-    studentUser = await User.create({
-      name: 'Aarav Sharma',
-      email: 'student@facultyhub.dev',
-      password: 'Student@1234',
-      role: 'student',
-    });
-    console.log('[CREATED] Student User: student@facultyhub.dev');
-  }
-
-  // Remove any old conflicting profile for this user that does not have 26001001
-  await Student.deleteMany({ userId: studentUser._id, enrollmentNumber: { $ne: '26001001' } });
-
-  let studentProfile = await Student.findOne({ enrollmentNumber: '26001001' });
-  if (!studentProfile) {
-    studentProfile = await Student.create({
-      userId: studentUser._id,
-      enrollmentNumber: '26001001',
-      rollNumber: '01',
-      fullName: 'Aarav Sharma',
-      email: studentUser.email,
-      phone: '+91 98765 00001',
-      department: dept._id,
-      semester: 5,
-      academicYear: '2026-2027',
-      status: 'active',
-    });
-    console.log('[CREATED] Student Profile: Aarav Sharma (26001001)');
-  } else {
-    studentProfile.fullName = 'Aarav Sharma';
-    studentProfile.rollNumber = '01';
-    studentProfile.department = dept._id;
-    studentProfile.semester = 5;
-    studentProfile.userId = studentUser._id;
-    studentProfile.email = studentUser.email;
-    await studentProfile.save();
-    console.log('[UPDATED] Student Profile: Aarav Sharma (26001001)');
-  }
+  // 5. Students are seeded by resetAndSeed.js
+  console.log('[SKIP] Demo student creation skipped — run resetAndSeed.js for 68-student seed.');
 
   await mongoose.disconnect();
   console.log('=== CORE DATABASE SEED COMPLETE ===');

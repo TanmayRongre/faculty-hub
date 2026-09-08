@@ -2,45 +2,44 @@ const mongoose = require('mongoose');
 
 const timetableSlotSchema = new mongoose.Schema(
   {
+    // Faculty reference — optional until real faculty records are linked
     faculty: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Faculty',
-      required: [true, 'Faculty is required'],
+      default: null,
+    },
+    // Faculty initials as shown in official timetable (e.g. SSP, RHR, PCJ, BPW, GRG)
+    // Used until actual faculty profiles are created and linked
+    facultyCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: null,
     },
     subject: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Subject',
-      required: [true, 'Subject is required'],
+      default: null,
     },
     subjectCode: {
       type: String,
-      required: [true, 'Subject code is required'],
-      uppercase: true,
       trim: true,
+      uppercase: true,
+      default: null,
     },
     subjectName: {
       type: String,
       trim: true,
+      default: null,
     },
     department: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Department',
       required: [true, 'Department is required'],
     },
-    course: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Course',
-      default: null,
-    },
     semester: {
       type: Number,
       default: 5,
-    },
-    division: {
-      type: String,
-      default: 'A',
-      uppercase: true,
-      trim: true,
     },
     academicYear: {
       type: String,
@@ -50,7 +49,7 @@ const timetableSlotSchema = new mongoose.Schema(
     dayOfWeek: {
       type: String,
       required: [true, 'Day of week is required'],
-      enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+      enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
     },
     startTime: {
       type: String,
@@ -65,12 +64,40 @@ const timetableSlotSchema = new mongoose.Schema(
     room: {
       type: String,
       trim: true,
-      default: 'Classroom',
+      default: null,
     },
+    /**
+     * lectureType:
+     *   theory    — common theory lecture (all students)
+     *   practical — batch-wise lab/practical session
+     *   activity  — curriculum/sports activity (not academic)
+     *   library   — library time (not academic)
+     *   off       — no lecture (OFF slot)
+     *   recess    — lunch/break (not academic)
+     */
     lectureType: {
       type: String,
-      enum: ['theory', 'practical', 'tutorial'],
+      enum: ['theory', 'practical', 'activity', 'library', 'off', 'recess'],
       default: 'theory',
+    },
+    /**
+     * isCommon:
+     *   true  — applies to ALL 68 students (theory)
+     *   false — applies only to a specific batch (practical)
+     */
+    isCommon: {
+      type: Boolean,
+      default: true,
+    },
+    /**
+     * batch:
+     *   'ALL' or null — for common/theory lectures
+     *   'A', 'B', 'C' — for batch-wise practicals
+     */
+    batch: {
+      type: String,
+      enum: ['A', 'B', 'C', 'ALL', null],
+      default: null,
     },
     status: {
       type: String,
@@ -83,8 +110,10 @@ const timetableSlotSchema = new mongoose.Schema(
   }
 );
 
-timetableSlotSchema.index({ faculty: 1, dayOfWeek: 1, status: 1 });
 timetableSlotSchema.index({ semester: 1, dayOfWeek: 1, status: 1 });
+timetableSlotSchema.index({ faculty: 1, dayOfWeek: 1, status: 1 });
 timetableSlotSchema.index({ room: 1, dayOfWeek: 1, status: 1 });
+timetableSlotSchema.index({ batch: 1, dayOfWeek: 1 });
+timetableSlotSchema.index({ lectureType: 1 });
 
 module.exports = mongoose.model('TimetableSlot', timetableSlotSchema);

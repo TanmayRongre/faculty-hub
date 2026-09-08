@@ -34,6 +34,7 @@ const getStudents = async (req, res) => {
       Student.find(filter)
         .populate('department', 'name code')
         .populate('userId', 'name email role isActive')
+        .collation({ locale: 'en', numericOrdering: true })
         .sort({ rollNumber: 1 })
         .skip(skip)
         .limit(limit),
@@ -130,7 +131,12 @@ const createStudent = async (req, res) => {
         return res.status(409).json({ success: false, message: 'User is already registered as faculty' });
       }
     } else {
-      const cleanEmail = email.toLowerCase().trim();
+      // Email is optional for CE students — generate a system email if not provided
+      const enrollUpper = enrollmentNumber.toUpperCase().trim();
+      const cleanEmail = email
+        ? email.toLowerCase().trim()
+        : `sys.${enrollUpper.toLowerCase()}@ce.drpdp.local`;
+
       let user = await User.findOne({ email: cleanEmail });
       if (user) {
         if (user.role !== 'student') {
@@ -158,10 +164,10 @@ const createStudent = async (req, res) => {
       }
     }
 
-    // Default to Computer Science department
+    // Default to Computer Engineering department
     let departmentId = req.body.department;
     if (!departmentId) {
-      const dept = await Department.findOne({ code: 'CO' }) || await Department.findOne();
+      const dept = await Department.findOne({ code: 'CE' }) || await Department.findOne();
       departmentId = dept ? dept._id : null;
     }
 
@@ -172,8 +178,10 @@ const createStudent = async (req, res) => {
       academicYear: req.body.academicYear || '2026-2027',
       userId: linkedUserId,
       enrollmentNumber: enrollmentNumber.toUpperCase().trim(),
-      email: email.toLowerCase().trim(),
+      email: email ? email.toLowerCase().trim() : null,
       fullName: fullName.trim(),
+      examSeatNumber: req.body.examSeatNumber || null,
+      batch: req.body.batch || null,
     };
 
     const student = await Student.create(studentData);
