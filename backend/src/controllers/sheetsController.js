@@ -72,7 +72,13 @@ async function getStatus(req, res) {
     }
 
     const status = await academicDataService.getConnectionStatus();
-    return res.json({ success: true, configured: true, ...status });
+    return res.json({
+      success: true,
+      configured: true,
+      spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
+      serviceAccountEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      ...status,
+    });
   } catch (err) {
     return handleSheetsError(err, res);
   }
