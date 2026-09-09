@@ -1,605 +1,926 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  CalendarDays,
+  BookOpen,
+  Beaker,
   CheckCircle2,
   XCircle,
-  Plus,
+  ArrowLeft,
+  Calendar,
+  Clock,
   Search,
   RefreshCw,
-  AlertTriangle,
-  UserRound,
-  Clock,
+  Users,
   ShieldAlert,
-  Save,
-  X,
+  History,
+  Check,
+  ChevronRight,
+  Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import FacultyLayout from './FacultyLayout';
-import { studentService } from '../../services/managementService';
 import {
-  getAttendanceMatrix,
-  submitAttendance,
+  getRoster,
+  saveAttendanceSession,
+  getAttendanceHistory,
   getDefaulters,
 } from '../../services/attendanceService';
-import { INSTITUTION } from '../../config/institution';
-import { ACADEMIC_CONFIG } from '../../config/academic';
+import { useAuth } from '../../context/AuthContext';
+
+const ATTENDANCE_SUBJECTS = [
+  { code: 'STE', name: 'Software Engineering' },
+  { code: 'OSY', name: 'Operating System' },
+  { code: 'ENDS', name: 'Entrepreneurship Development and Startups' },
+  { code: 'ACN', name: 'Advance Computer Network' },
+];
+
+const PRACTICAL_BATCHES = [
+  { batch: 'A', range: 'Roll No. 1–24', count: 24 },
+  { batch: 'B', range: 'Roll No. 25–47', count: 23 },
+  { batch: 'C', range: 'Roll No. 48–68', count: 21 },
+];
+
+const LECTURE_TIME_SLOTS = [
+  '10:30 - 11:30',
+  '11:30 - 12:30',
+  '12:30 - 01:30',
+];
+
+const PRACTICAL_TIME_SLOTS = [
+  '01:50 - 03:50',
+  '04:00 - 06:00',
+];
 
 const AttendancePage = () => {
-  // Tabs: 'matrix' | 'defaulters'
-  const [activeTab, setActiveTab] = useState('matrix');
+  const { user, isAdmin } = useAuth();
 
-  // Filter state
-  const [selectedSubject, setSelectedSubject] = useState(ACADEMIC_CONFIG.SUBJECTS[0].code);
+  // Navigation Steps: 'TYPE' | 'SUBJECT' | 'BATCH' | 'MARKING' | 'HISTORY'
+  const [step, setStep] = useState('TYPE');
+
+  // Hierarchy Selection State
+  const [attendanceType, setAttendanceType] = useState(null); // 'LECTURE' | 'PRACTICAL'
+  const [selectedSubject, setSelectedSubject] = useState(null); // 'STE' | 'OSY' | 'ENDS' | 'ACN'
+  const [selectedBatch, setSelectedBatch] = useState(null); // 'A' | 'B' | 'C'
+
+  // Session Marking State
+  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [slot, setSlot] = useState('10:30 - 11:30');
+  const [roster, setRoster] = useState([]);
+  const [attendanceMap, setAttendanceMap] = useState({}); // { [rollNumber]: 'PRESENT' | 'ABSENT' }
   const [searchQuery, setSearchQuery] = useState('');
+  const [loadingRoster, setLoadingRoster] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Data state
-  const [matrixData, setMatrixData] = useState({ lectures: [], students: [] });
-  const [defaultersData, setDefaultersData] = useState({ defaulters: [] });
-  const [loading, setLoading] = useState(true);
+  // History & Defaulters State
+  const [historyList, setHistoryList] = useState([]);
+  const [defaultersList, setDefaultersList] = useState([]);
+  const [historyTab, setHistoryTab] = useState('sessions'); // 'sessions' | 'defaulters'
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
-  // Fast Attendance Modal state
-  const [showMarkModal, setShowMarkModal] = useState(false);
-  const [markDate, setMarkDate] = useState(new Date().toISOString().split('T')[0]);
-  const [markSubject, setMarkSubject] = useState(ACADEMIC_CONFIG.SUBJECTS[0].code);
-  const [markSlot, setMarkSlot] = useState('09:00 - 10:00');
-  const [rosterStudents, setRosterStudents] = useState([]);
-  const [absentEnrollments, setAbsentEnrollments] = useState(new Set());
-  const [submittingAttendance, setSubmittingAttendance] = useState(false);
+  // ─── Hierarchy Handlers ───────────────────────────────────────────────────
 
-  // Load Matrix Data
-  const loadMatrix = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [matrixRes, defRes] = await Promise.all([
-        getAttendanceMatrix({ subjectCode: selectedSubject, semester: 5 }),
-        getDefaulters({ subjectCode: selectedSubject, semester: 5 }),
-      ]);
-      setMatrixData(matrixRes.data || { lectures: [], students: [] });
-      setDefaultersData(defRes.data || { defaulters: [] });
-    } catch (err) {
-      console.error('Failed to load attendance matrix:', err);
-      toast.error('Failed to load attendance');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedSubject]);
+  const handleSelectType = (type) => {
+    setAttendanceType(type);
+    setSelectedSubject(null);
+    setSelectedBatch(null);
+    setSlot(type === 'PRACTICAL' ? '01:50 - 03:50' : '10:30 - 11:30');
+    setStep('SUBJECT');
+  };
 
-  useEffect(() => {
-    loadMatrix();
-  }, [loadMatrix]);
-
-  // Load Student Roster for Fast Marking Modal
-  const openMarkModal = async () => {
-    try {
-      const res = await studentService.getStudents({ limit: 100, semester: 5 });
-      setRosterStudents(res.data || []);
-      setAbsentEnrollments(new Set()); // All present by default
-      setShowMarkModal(true);
-    } catch (err) {
-      toast.error('Failed to load student roster');
+  const handleSelectSubject = (subCode) => {
+    setSelectedSubject(subCode);
+    if (attendanceType === 'PRACTICAL') {
+      setSelectedBatch(null);
+      setStep('BATCH');
+    } else {
+      setSelectedBatch(null);
+      fetchRosterAndProceed('LECTURE', subCode, null);
     }
   };
 
-  // Toggle student absent status in modal
-  const toggleAbsent = (enrollmentNumber) => {
-    setAbsentEnrollments((prev) => {
-      const next = new Set(prev);
-      if (next.has(enrollmentNumber)) {
-        next.delete(enrollmentNumber);
-      } else {
-        next.add(enrollmentNumber);
+  const handleSelectBatch = (batchId) => {
+    setSelectedBatch(batchId);
+    fetchRosterAndProceed('PRACTICAL', selectedSubject, batchId);
+  };
+
+  // Fetch exact student slice for marking
+  const fetchRosterAndProceed = async (type, subCode, batchId) => {
+    setLoadingRoster(true);
+    try {
+      const res = await getRoster({
+        attendanceType: type,
+        subjectCode: subCode,
+        batch: batchId,
+      });
+
+      const students = res.students || [];
+      setRoster(students);
+
+      // Present by default for all students in the slice
+      const initialMap = {};
+      for (const s of students) {
+        initialMap[String(s.rollNumber)] = 'PRESENT';
       }
-      return next;
+      setAttendanceMap(initialMap);
+      setSearchQuery('');
+      setStep('MARKING');
+    } catch (err) {
+      console.error('Failed to load roster:', err);
+      toast.error(err.response?.data?.message || 'Failed to load student roster');
+    } finally {
+      setLoadingRoster(false);
+    }
+  };
+
+  // ─── Status Modification ──────────────────────────────────────────────────
+
+  const toggleStudentStatus = (rollNumber) => {
+    setAttendanceMap((prev) => {
+      const current = prev[rollNumber] || 'PRESENT';
+      return {
+        ...prev,
+        [rollNumber]: current === 'PRESENT' ? 'ABSENT' : 'PRESENT',
+      };
     });
   };
 
-  // Mark all absent or reset
-  const markAllAbsent = () => {
-    const all = new Set(rosterStudents.map((s) => s.enrollmentNumber));
-    setAbsentEnrollments(all);
-    toast('All students marked Absent');
+  const setAllStatus = (status) => {
+    setAttendanceMap((prev) => {
+      const next = { ...prev };
+      for (const s of roster) {
+        next[String(s.rollNumber)] = status;
+      }
+      return next;
+    });
+    toast.success(`Marked all students as ${status === 'PRESENT' ? 'Present' : 'Absent'}`);
   };
 
-  const markAllPresent = () => {
-    setAbsentEnrollments(new Set());
-    toast.success('All students marked Present');
-  };
+  // ─── Save Attendance ──────────────────────────────────────────────────────
 
-  // Submit Fast Attendance
-  const handleAttendanceSubmit = async (e) => {
-    e.preventDefault();
-    if (!markDate) return toast.error('Date is required');
-    if (!markSubject) return toast.error('Subject is required');
+  const handleSaveAttendance = async () => {
+    if (!date) {
+      toast.error('Please select a valid date');
+      return;
+    }
 
-    setSubmittingAttendance(true);
+    setSaving(true);
     try {
+      const records = roster.map((s) => ({
+        rollNumber: s.rollNumber,
+        enrollmentNumber: s.enrollmentNumber,
+        status: attendanceMap[String(s.rollNumber)] || 'PRESENT',
+      }));
+
+      const absentRolls = roster
+        .filter((s) => (attendanceMap[String(s.rollNumber)] || 'PRESENT') === 'ABSENT')
+        .map((s) => String(s.rollNumber));
+
       const payload = {
-        date: markDate,
-        subjectCode: markSubject,
-        semester: 5,
-        slot: markSlot.replace(/\s+/g, ''),
-        absentEnrollments: Array.from(absentEnrollments),
+        attendanceType,
+        subjectCode: selectedSubject,
+        batch: attendanceType === 'PRACTICAL' ? selectedBatch : null,
+        date,
+        slot,
+        absentRolls,
+        records,
       };
 
-      const res = await submitAttendance(payload);
+      const res = await saveAttendanceSession(payload);
       toast.success(
-        `Attendance recorded! Present: ${res.data.present}, Absent: ${res.data.absent}`,
-        { duration: 4000 }
+        `Attendance saved! Present: ${res.data.present} | Absent: ${res.data.absent}`,
+        { duration: 4500 }
       );
-      setShowMarkModal(false);
-      loadMatrix();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to record attendance');
+      console.error('Failed to save attendance:', err);
+      toast.error(err.response?.data?.message || 'Failed to save attendance');
     } finally {
-      setSubmittingAttendance(false);
+      setSaving(false);
     }
   };
 
-  // Filter students in matrix view
-  const filteredMatrixStudents = useMemo(() => {
+  // ─── History & Defaulters Loading ─────────────────────────────────────────
+
+  const loadHistory = useCallback(async () => {
+    setLoadingHistory(true);
+    try {
+      const [histRes, defRes] = await Promise.all([
+        getAttendanceHistory(),
+        getDefaulters(),
+      ]);
+      setHistoryList(histRes.data || []);
+      setDefaultersList(defRes.data?.defaulters || []);
+    } catch (err) {
+      console.error('Failed to load history:', err);
+      toast.error('Failed to load attendance history');
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (step === 'HISTORY') {
+      loadHistory();
+    }
+  }, [step, loadHistory]);
+
+  // ─── Filtered Roster for Table ────────────────────────────────────────────
+
+  const filteredRoster = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return matrixData.students || [];
-    return (matrixData.students || []).filter(
+    if (!q) return roster;
+    return roster.filter(
       (s) =>
+        String(s.rollNumber).toLowerCase().includes(q) ||
         s.fullName?.toLowerCase().includes(q) ||
-        s.rollNumber?.toLowerCase().includes(q) ||
         s.enrollmentNumber?.toLowerCase().includes(q)
     );
-  }, [matrixData.students, searchQuery]);
+  }, [roster, searchQuery]);
+
+  const counts = useMemo(() => {
+    let present = 0;
+    let absent = 0;
+    for (const s of roster) {
+      if (attendanceMap[String(s.rollNumber)] === 'ABSENT') {
+        absent++;
+      } else {
+        present++;
+      }
+    }
+    return { present, absent, total: roster.length };
+  }, [roster, attendanceMap]);
 
   return (
     <FacultyLayout>
-      <div className="p-4 sm:p-6 md:p-8 max-w-full">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+
+        {/* ─── Top Bar & Breadcrumb Navigation ──────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
           <div>
-            <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
-              {INSTITUTION.name} • {ACADEMIC_CONFIG.DEPARTMENT.name}
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white">Attendance Management Matrix</h1>
-            <p className="text-slate-400 mt-1 text-xs sm:text-sm">
-              Session-by-session matrix view for {ACADEMIC_CONFIG.SEMESTER.displayName}. All students default to <span className="text-emerald-400 font-semibold">Present</span>.
-            </p>
-          </div>
-
-          {/* Actions: Refresh & Take Attendance */}
-          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
-            <button
-              onClick={loadMatrix}
-              disabled={loading}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-medium border border-slate-700 transition-all flex items-center gap-2"
-            >
-              <RefreshCw size={15} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
-              <span>Refresh</span>
-            </button>
-
-            <button
-              onClick={openMarkModal}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-900/30 transition-all flex items-center gap-2"
-            >
-              <Plus size={16} aria-hidden="true" />
-              <span>Take Attendance</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Tab & Controls Bar */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4 mb-6 space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            {/* Subject Selector Tabs */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold text-slate-400 uppercase mr-1">Subject:</span>
-              {ACADEMIC_CONFIG.SUBJECTS.map((sub) => {
-                const isActive = selectedSubject === sub.code;
-                return (
+            {/* Breadcrumb Hierarchy */}
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-1 flex-wrap">
+              <button
+                onClick={() => setStep('TYPE')}
+                className="hover:text-blue-400 transition-colors uppercase tracking-wider"
+              >
+                Attendance
+              </button>
+              {attendanceType && step !== 'TYPE' && (
+                <>
+                  <ChevronRight size={12} className="text-slate-600" />
                   <button
-                    key={sub.code}
-                    onClick={() => setSelectedSubject(sub.code)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      isActive
-                        ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30 border border-blue-500'
-                        : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700/60'
-                    }`}
+                    onClick={() => setStep('SUBJECT')}
+                    className="hover:text-blue-400 transition-colors uppercase tracking-wider text-blue-400"
                   >
-                    {sub.code}
+                    {attendanceType}
                   </button>
-                );
-              })}
-            </div>
-
-            {/* Tab switch: Matrix View vs Defaulters */}
-            <div className="flex bg-slate-800 border border-slate-700 rounded-lg p-1">
-              <button
-                onClick={() => setActiveTab('matrix')}
-                className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition-all ${
-                  activeTab === 'matrix' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Matrix View ({matrixData.lectures?.length || 0} Lectures)
-              </button>
-              <button
-                onClick={() => setActiveTab('defaulters')}
-                className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  activeTab === 'defaulters' ? 'bg-red-600 text-white shadow' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <ShieldAlert size={13} aria-hidden="true" />
-                Defaulters (&lt;75%)
-                {defaultersData.defaulters?.length > 0 && (
-                  <span className="ml-1 px-1.5 py-0.2 rounded-full bg-red-950 text-white text-[10px] font-mono">
-                    {defaultersData.defaulters.length}
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Search */}
-          <div className="flex items-center justify-between border-t border-slate-800/80 pt-3">
-            <div className="relative w-full md:w-80">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 pointer-events-none">
-                <Search size={14} aria-hidden="true" />
-              </span>
-              <input
-                type="text"
-                placeholder="Search Roll No or Student..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div className="text-xs text-slate-400 font-mono hidden md:block">
-              Defaulter Threshold: &lt; 75%
-            </div>
-          </div>
-        </div>
-
-        {/* ─── VIEW 1: MATRIX TABLE ────────────────────────────────────────── */}
-        {activeTab === 'matrix' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
-            {loading ? (
-              <div className="p-16 text-center">
-                <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <div className="text-slate-400 text-sm">Loading attendance matrix for {selectedSubject}...</div>
-              </div>
-            ) : filteredMatrixStudents.length === 0 ? (
-              <div className="p-16 text-center text-slate-500 text-sm">
-                No attendance records found. Click "Take Attendance" above to record the first session.
-              </div>
-            ) : (
-              <div className="overflow-x-auto max-w-full">
-                <table className="w-full text-xs text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-800 bg-slate-800/80 text-slate-400">
-                      {/* Sticky Student Name & Roll No */}
-                      <th className="sticky left-0 bg-slate-800 z-20 px-4 py-3.5 font-bold text-white border-r border-slate-700 min-w-[200px]">
-                        Student Name
-                      </th>
-                      <th className="px-3 py-3.5 font-semibold text-center w-16 border-r border-slate-700">
-                        Roll
-                      </th>
-
-                      {/* Dynamic Lecture Columns */}
-                      {matrixData.lectures?.map((lec, idx) => (
-                        <th
-                          key={lec.lectureId || idx}
-                          className="px-3 py-2 text-center border-r border-slate-800 min-w-[110px]"
-                        >
-                          <div className="font-bold text-slate-200 font-mono text-[11px]">{lec.date}</div>
-                          <div className="text-[10px] text-blue-400 uppercase font-mono">{lec.subjectCode}</div>
-                        </th>
-                      ))}
-
-                      {/* Summary Columns */}
-                      <th className="px-4 py-3.5 font-bold text-center border-l border-slate-700 min-w-[90px]">
-                        Attended
-                      </th>
-                      <th className="px-4 py-3.5 font-bold text-center min-w-[90px]">
-                        Overall %
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60">
-                    {filteredMatrixStudents.map((student) => {
-                      const isDef = student.isDefaulter;
-                      return (
-                        <tr
-                          key={student.enrollmentNumber}
-                          className={`hover:bg-slate-800/40 transition-colors ${
-                            isDef ? 'bg-red-950/10' : ''
-                          }`}
-                        >
-                          {/* Student Name */}
-                          <td className="sticky left-0 bg-slate-900 hover:bg-slate-850 z-10 px-4 py-3 font-semibold text-white border-r border-slate-800 truncate max-w-[200px]">
-                            {student.fullName}
-                          </td>
-
-                          {/* Roll No */}
-                          <td className="px-3 py-3 text-center font-mono font-bold text-slate-400 border-r border-slate-800">
-                            {student.rollNumber || '—'}
-                          </td>
-
-                          {/* Lecture Matrix Cells */}
-                          {matrixData.lectures?.map((lec, idx) => {
-                            const status = student.attendance[lec.lectureId];
-                            const isPresent = status === 'Present';
-                            const isAbsent = status === 'Absent';
-
-                            return (
-                              <td
-                                key={lec.lectureId || idx}
-                                className="px-3 py-3 text-center border-r border-slate-800/80 font-mono"
-                              >
-                                {isPresent && (
-                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 font-bold text-[11px]">
-                                    P
-                                  </span>
-                                )}
-                                {isAbsent && (
-                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-red-950/80 text-red-400 border border-red-800/40 font-bold text-[11px]">
-                                    A
-                                  </span>
-                                )}
-                                {!status && <span className="text-slate-600 font-mono">—</span>}
-                              </td>
-                            );
-                          })}
-
-                          {/* Attended Count */}
-                          <td className="px-4 py-3 text-center font-mono text-slate-300 font-semibold border-l border-slate-800">
-                            {student.attendedCount} / {student.totalClasses}
-                          </td>
-
-                          {/* Overall Percentage */}
-                          <td className="px-4 py-3 text-center font-mono font-bold">
-                            <span
-                              className={`px-2 py-1 rounded-md text-xs ${
-                                isDef
-                                  ? 'bg-red-950 text-red-400 border border-red-800/40'
-                                  : student.percentage >= 85
-                                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/40'
-                                  : 'bg-blue-950 text-blue-400 border border-blue-800/40'
-                              }`}
-                            >
-                              {student.percentage}%
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ─── VIEW 2: DEFAULTERS LIST ─────────────────────────────────────── */}
-        {activeTab === 'defaulters' && (
-          <div className="space-y-4">
-            <div className="bg-red-950/20 border border-red-800/40 rounded-xl p-4 flex items-center justify-between text-red-300 text-sm">
-              <div className="flex items-center gap-2">
-                <AlertTriangle size={16} className="text-red-400 shrink-0" aria-hidden="true" />
-                <span>
-                  Showing students with attendance below the mandatory <strong className="text-white">75%</strong> threshold.
-                </span>
-              </div>
-              <span className="font-mono font-bold text-red-400">
-                {defaultersData.defaulters?.length || 0} Defaulters
-              </span>
-            </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-              {defaultersData.defaulters?.length === 0 ? (
-                <div className="p-16 text-center text-emerald-400 text-sm flex flex-col items-center gap-2">
-                  <CheckCircle2 size={32} className="text-emerald-500" aria-hidden="true" />
-                  <span className="font-bold text-base">No Defaulters Found!</span>
-                  <span className="text-slate-400 text-xs">All students maintain attendance ≥ 75%.</span>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-800 bg-slate-800/50 text-slate-400 text-xs">
-                        <th className="text-left px-5 py-3.5 font-semibold">Roll No</th>
-                        <th className="text-left px-5 py-3.5 font-semibold">Enrollment Number</th>
-                        <th className="text-center px-5 py-3.5 font-semibold">Classes Attended</th>
-                        <th className="text-center px-5 py-3.5 font-semibold">Total Classes</th>
-                        <th className="text-center px-5 py-3.5 font-semibold">Attendance %</th>
-                        <th className="text-center px-5 py-3.5 font-semibold">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/50">
-                      {defaultersData.defaulters?.map((d) => (
-                        <tr key={d.enrollmentNumber} className="hover:bg-slate-800/20">
-                          <td className="px-5 py-3.5 font-mono font-bold text-white">
-                            {d.rollNumber || '—'}
-                          </td>
-                          <td className="px-5 py-3.5 font-mono text-xs text-slate-400">
-                            {d.enrollmentNumber}
-                          </td>
-                          <td className="px-5 py-3.5 text-center font-mono text-red-400">
-                            {d.totalPresent || d.attendedCount || 0}
-                          </td>
-                          <td className="px-5 py-3.5 text-center font-mono text-slate-400">
-                            {d.totalClasses || 0}
-                          </td>
-                          <td className="px-5 py-3.5 text-center font-mono font-bold text-red-400">
-                            {d.overallPercentage || d.percentage}%
-                          </td>
-                          <td className="px-5 py-3.5 text-center">
-                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-950/80 text-red-400 border border-red-800/40">
-                              DEFAULTER
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                </>
+              )}
+              {selectedSubject && (step === 'BATCH' || step === 'MARKING') && (
+                <>
+                  <ChevronRight size={12} className="text-slate-600" />
+                  <span className="text-white font-bold">{selectedSubject}</span>
+                </>
+              )}
+              {selectedBatch && step === 'MARKING' && (
+                <>
+                  <ChevronRight size={12} className="text-slate-600" />
+                  <span className="text-purple-400 font-bold">Batch {selectedBatch}</span>
+                </>
               )}
             </div>
+
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              {step === 'TYPE' && 'Attendance Management'}
+              {step === 'SUBJECT' && `${attendanceType} Attendance — Select Subject`}
+              {step === 'BATCH' && `${selectedSubject} — Practical — Select Batch`}
+              {step === 'MARKING' &&
+                (attendanceType === 'LECTURE'
+                  ? `${selectedSubject} — Lecture Attendance`
+                  : `${selectedSubject} — Practical — Batch ${selectedBatch}`)}
+              {step === 'HISTORY' && 'Attendance History & Analytics'}
+            </h1>
+          </div>
+
+          {/* Top Actions */}
+          <div className="flex items-center gap-2.5">
+            {step !== 'TYPE' && step !== 'HISTORY' && (
+              <button
+                onClick={() => {
+                  if (step === 'MARKING') {
+                    setStep(attendanceType === 'PRACTICAL' ? 'BATCH' : 'SUBJECT');
+                  } else if (step === 'BATCH') {
+                    setStep('SUBJECT');
+                  } else if (step === 'SUBJECT') {
+                    setStep('TYPE');
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition-all flex items-center gap-1.5"
+              >
+                <ArrowLeft size={14} />
+                <span>Back</span>
+              </button>
+            )}
+
+            {step !== 'HISTORY' ? (
+              <button
+                onClick={() => setStep('HISTORY')}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                <History size={15} className="text-blue-400" />
+                <span>History &amp; Defaulters</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setStep('TYPE')}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md shadow-blue-900/30 flex items-center gap-1.5"
+              >
+                <CheckCircle2 size={15} />
+                <span>Take Attendance</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ─── SCREEN 1: PRIMARY TWO CHOICES (LECTURE OR PRACTICAL) ─────────── */}
+        {step === 'TYPE' && (
+          <div className="space-y-6 pt-4">
+            <div className="text-center max-w-xl mx-auto space-y-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-400 bg-blue-950/60 px-3 py-1 rounded-full border border-blue-800/40">
+                Primary Selection
+              </span>
+              <h2 className="text-xl sm:text-2xl font-bold text-white">Select Attendance Type</h2>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                Choose whether you are recording a theory lecture common for the entire class, or a laboratory practical for a specific student batch.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto pt-2">
+              {/* 1. LECTURE CARD */}
+              <button
+                onClick={() => handleSelectType('LECTURE')}
+                className="group relative text-left p-6 sm:p-8 rounded-2xl bg-gradient-to-b from-slate-800/90 to-slate-900 border-2 border-slate-700/80 hover:border-blue-500 shadow-xl hover:shadow-2xl hover:shadow-blue-900/20 transition-all duration-200 transform hover:-translate-y-1 focus:outline-none"
+              >
+                <div className="flex items-start justify-between mb-5">
+                  <div className="p-3.5 rounded-xl bg-blue-950/80 border border-blue-700/50 text-blue-400 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                    <BookOpen size={28} />
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-950 text-blue-300 border border-blue-800/60">
+                    68 Students
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-300 transition-colors">
+                  Lecture Attendance
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-4">
+                  Common theory session for the entire 5th semester Computer Engineering class. All 68 students are presented in numerical roll order (Roll 1–68).
+                </p>
+                <div className="flex items-center text-xs font-bold text-blue-400 group-hover:translate-x-1 transition-transform">
+                  <span>Continue to Subject Selection</span>
+                  <ChevronRight size={14} className="ml-1" />
+                </div>
+              </button>
+
+              {/* 2. PRACTICAL CARD */}
+              <button
+                onClick={() => handleSelectType('PRACTICAL')}
+                className="group relative text-left p-6 sm:p-8 rounded-2xl bg-gradient-to-b from-slate-800/90 to-slate-900 border-2 border-slate-700/80 hover:border-purple-500 shadow-xl hover:shadow-2xl hover:shadow-purple-900/20 transition-all duration-200 transform hover:-translate-y-1 focus:outline-none"
+              >
+                <div className="flex items-start justify-between mb-5">
+                  <div className="p-3.5 rounded-xl bg-purple-950/80 border border-purple-700/50 text-purple-400 group-hover:scale-110 group-hover:bg-purple-600 group-hover:text-white transition-all">
+                    <Beaker size={28} />
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-950 text-purple-300 border border-purple-800/60">
+                    Batches A / B / C
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2 group-hover:text-purple-300 transition-colors">
+                  Practical Attendance
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-4">
+                  Laboratory practical sessions divided into 3 dedicated batches: Batch A (Roll 1–24), Batch B (Roll 25–47), and Batch C (Roll 48–68).
+                </p>
+                <div className="flex items-center text-xs font-bold text-purple-400 group-hover:translate-x-1 transition-transform">
+                  <span>Select Subject &amp; Batch</span>
+                  <ChevronRight size={14} className="ml-1" />
+                </div>
+              </button>
+            </div>
           </div>
         )}
 
-        {/* ─── MODAL: FAST ATTENDANCE RECORDING ─────────────────────────────── */}
-        {showMarkModal && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl max-h-[96vh] flex flex-col">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold text-white">Fast Attendance Marking</h3>
-                  <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
-                    Click students who are <span className="text-red-400 font-bold">ABSENT</span>. Everyone is <span className="text-emerald-400 font-bold">Present</span> by default.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowMarkModal(false)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
-                  aria-label="Close"
-                >
-                  <X size={18} aria-hidden="true" />
-                </button>
+        {/* ─── SCREEN 2: SELECT SUBJECT (STE, OSY, ENDS, ACN) ───────────────── */}
+        {step === 'SUBJECT' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">
+                  Step 2 of {attendanceType === 'PRACTICAL' ? '3' : '2'}
+                </span>
+                <h2 className="text-lg font-bold text-white mt-0.5">
+                  Select {attendanceType === 'LECTURE' ? 'Lecture' : 'Practical'} Subject
+                </h2>
               </div>
+            </div>
 
-              {/* Form Controls */}
-              <form onSubmit={handleAttendanceSubmit} className="flex-1 flex flex-col min-h-0">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {ATTENDANCE_SUBJECTS.map((sub) => (
+                <button
+                  key={sub.code}
+                  onClick={() => handleSelectSubject(sub.code)}
+                  className="p-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500/80 hover:bg-slate-800/90 text-left transition-all group shadow-lg hover:shadow-blue-900/10"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-lg font-mono font-black text-blue-400 group-hover:text-white transition-colors">
+                      {sub.code}
+                    </span>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 bg-slate-800 px-2 py-0.5 rounded">
+                      5th Sem
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-semibold text-slate-200 group-hover:text-blue-300 transition-colors mb-2">
+                    {sub.name}
+                  </h4>
+                  <div className="flex items-center text-xs font-medium text-slate-400 group-hover:text-blue-400 pt-2 border-t border-slate-800">
+                    <span>Select Subject</span>
+                    <ChevronRight size={14} className="ml-1 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ─── SCREEN 3: SELECT BATCH (PRACTICAL ONLY: A, B, C) ─────────────── */}
+        {step === 'BATCH' && (
+          <div className="space-y-6">
+            <div>
+              <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">
+                Step 3 of 3 • Practical Laboratory Batch
+              </span>
+              <h2 className="text-lg font-bold text-white mt-0.5">
+                {selectedSubject} Practical — Select Batch
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Each batch contains a fixed, non-overlapping subset of the 68 students.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+              {PRACTICAL_BATCHES.map((b) => (
+                <button
+                  key={b.batch}
+                  onClick={() => handleSelectBatch(b.batch)}
+                  className="p-6 rounded-xl bg-slate-900 border border-slate-800 hover:border-purple-500 hover:bg-slate-800/90 text-left transition-all group shadow-xl hover:shadow-purple-900/20"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-purple-950/80 border border-purple-800/60 flex items-center justify-center font-black text-xl text-purple-300 group-hover:bg-purple-600 group-hover:text-white transition-all">
+                      {b.batch}
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-800 border border-slate-700 text-slate-300">
+                      {b.count} Students
+                    </span>
+                  </div>
+                  <h4 className="text-base font-bold text-white mb-1">Batch {b.batch}</h4>
+                  <p className="text-xs font-mono text-purple-400 font-semibold mb-3">{b.range}</p>
+                  <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                    Attendance will be recorded strictly for {b.count} students belonging to Batch {b.batch}.
+                  </p>
+                  <div className="flex items-center text-xs font-bold text-purple-400 group-hover:translate-x-1 transition-transform">
+                    <span>Open Attendance Sheet</span>
+                    <ChevronRight size={14} className="ml-1" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ─── SCREEN 4: ATTENDANCE MARKING SHEET (ALL 68 OR BATCH) ──────────── */}
+        {step === 'MARKING' && (
+          <div className="space-y-5">
+            {/* Session Info & Controls Header */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-4">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                {/* Session Meta */}
+                <div className="flex items-center gap-3">
+                  <div className={`p-3 rounded-xl ${attendanceType === 'LECTURE' ? 'bg-blue-950/80 border border-blue-700/50 text-blue-400' : 'bg-purple-950/80 border border-purple-700/50 text-purple-400'}`}>
+                    {attendanceType === 'LECTURE' ? <BookOpen size={24} /> : <Beaker size={24} />}
+                  </div>
                   <div>
-                    <label className="block text-[11px] sm:text-xs text-slate-400 mb-1 font-medium">Session Date *</label>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                        {attendanceType}
+                      </span>
+                      <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800/60">
+                        {selectedSubject}
+                      </span>
+                      {selectedBatch && (
+                        <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800/60">
+                          Batch {selectedBatch}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-1">
+                      {attendanceType === 'LECTURE'
+                        ? 'Common Theory • Full Class (68 Students)'
+                        : `Laboratory Session • Batch ${selectedBatch} (${counts.total} Students)`}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Date & Time Slot Pickers */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300">
+                    <Calendar size={14} className="text-slate-400" />
                     <input
                       type="date"
-                      value={markDate}
-                      onChange={(e) => setMarkDate(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
-                      required
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      className="bg-transparent text-white focus:outline-none font-mono text-xs"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-[11px] sm:text-xs text-slate-400 mb-1 font-medium">Subject *</label>
+                  <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300">
+                    <Clock size={14} className="text-slate-400" />
                     <select
-                      value={markSubject}
-                      onChange={(e) => setMarkSubject(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                      value={slot}
+                      onChange={(e) => setSlot(e.target.value)}
+                      className="bg-transparent text-white focus:outline-none font-mono text-xs cursor-pointer"
                     >
-                      {ACADEMIC_CONFIG.SUBJECTS.map((s) => (
-                        <option key={s.code} value={s.code}>
-                          {s.code} — {s.name}
+                      {(attendanceType === 'PRACTICAL' ? PRACTICAL_TIME_SLOTS : LECTURE_TIME_SLOTS).map((s) => (
+                        <option key={s} value={s} className="bg-slate-800 text-white">
+                          {s}
                         </option>
                       ))}
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-[11px] sm:text-xs text-slate-400 mb-1 font-medium">Time / Slot</label>
-                    <input
-                      type="text"
-                      value={markSlot}
-                      onChange={(e) => setMarkSlot(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
-                      placeholder="e.g. 10:00 - 11:00"
-                    />
-                  </div>
-                </div>
-
-                {/* Quick Toggle Buttons */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 text-xs">
-                  <div className="text-slate-400 text-[11px] sm:text-xs">
-                    Present: <strong className="text-emerald-400 font-mono">{rosterStudents.length - absentEnrollments.size}</strong> | Absent: <strong className="text-red-400 font-mono">{absentEnrollments.size}</strong>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={markAllPresent}
-                      className="flex-1 sm:flex-none px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px]"
-                    >
-                      Reset All Present
-                    </button>
-                    <button
-                      type="button"
-                      onClick={markAllAbsent}
-                      className="flex-1 sm:flex-none px-2.5 py-1 rounded bg-red-950/40 hover:bg-red-900/50 text-red-400 border border-red-800/40 text-[11px]"
-                    >
-                      Mark All Absent
-                    </button>
-                  </div>
-                </div>
-
-                {/* Student Clickable Roster */}
-                <div className="flex-1 overflow-y-auto border border-slate-800 rounded-xl p-2 sm:p-3 bg-slate-950/50 grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-                  {rosterStudents.map((student) => {
-                    const isAbsent = absentEnrollments.has(student.enrollmentNumber);
-                    return (
-                      <div
-                        key={student._id || student.enrollmentNumber}
-                        onClick={() => toggleAbsent(student.enrollmentNumber)}
-                        className={`p-3 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between ${
-                          isAbsent
-                            ? 'bg-red-950/40 border-red-800/60 shadow-md shadow-red-950/30'
-                            : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                  {/* Quick slot selection pills */}
+                  <div className="flex items-center gap-1.5">
+                    {(attendanceType === 'PRACTICAL' ? PRACTICAL_TIME_SLOTS : LECTURE_TIME_SLOTS).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setSlot(s)}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-all ${
+                          slot === s
+                            ? 'bg-blue-600 text-white font-bold shadow-sm'
+                            : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700/60'
                         }`}
                       >
-                        <div className="flex items-center gap-2.5">
-                          <span className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center font-mono font-bold text-xs text-slate-300">
-                            {student.rollNumber || '—'}
-                          </span>
-                          <div>
-                            <div className="font-semibold text-white text-xs leading-tight">
-                              {student.fullName}
-                            </div>
-                            <div className="text-[10px] font-mono text-slate-500">
-                              {student.enrollmentNumber}
-                            </div>
-                          </div>
-                        </div>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
-                        {isAbsent ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-900/60 text-red-300 border border-red-700/50">
-                            ABSENT
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
-                            PRESENT
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
+              {/* Counts & Search / Utility Controls */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-3 border-t border-slate-800">
+                {/* Status Badges */}
+                <div className="flex items-center gap-3">
+                  <div className="px-3 py-1 rounded-lg bg-emerald-950/60 border border-emerald-800/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5">
+                    <CheckCircle2 size={13} className="text-emerald-400" />
+                    <span>Present: {counts.present}</span>
+                  </div>
+                  <div className="px-3 py-1 rounded-lg bg-red-950/60 border border-red-800/40 text-red-300 text-xs font-bold flex items-center gap-1.5">
+                    <XCircle size={13} className="text-red-400" />
+                    <span>Absent: {counts.absent}</span>
+                  </div>
+                  <div className="text-xs text-slate-400 font-mono hidden sm:inline">
+                    Total: {counts.total}
+                  </div>
                 </div>
 
-                {/* Submit Bar */}
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                {/* Bulk Actions & Search */}
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
-                    onClick={() => setShowMarkModal(false)}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg"
+                    onClick={() => setAllStatus('PRESENT')}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700"
                   >
-                    Cancel
+                    All Present
                   </button>
                   <button
-                    type="submit"
-                    disabled={submittingAttendance || rosterStudents.length === 0}
-                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow-lg shadow-emerald-900/30 transition-all flex items-center gap-2"
+                    type="button"
+                    onClick={() => setAllStatus('ABSENT')}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700"
                   >
-                    {submittingAttendance ? (
-                      <>
-                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Saving...</span>
-                      </>
+                    All Absent
+                  </button>
+
+                  {/* Search Input */}
+                  <div className="relative">
+                    <Search size={13} className="absolute inset-y-0 left-2.5 my-auto text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Search roll or name..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-7 pr-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 w-44 sm:w-52"
+                    />
+                  </div>
+
+                  {/* Primary Save Button */}
+                  <button
+                    onClick={handleSaveAttendance}
+                    disabled={saving}
+                    className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-emerald-900/30 flex items-center gap-1.5"
+                  >
+                    {saving ? (
+                      <RefreshCw size={13} className="animate-spin" />
                     ) : (
-                      <>
-                        <Save size={14} aria-hidden="true" />
-                        <span>Save Attendance</span>
-                      </>
+                      <Check size={14} />
                     )}
+                    <span>{saving ? 'Saving...' : 'SAVE ATTENDANCE'}</span>
                   </button>
                 </div>
-              </form>
+              </div>
+            </div>
+
+            {/* Attendance Roster Table */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+              {loadingRoster ? (
+                <div className="p-16 text-center">
+                  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                  <div className="text-slate-400 text-sm">Loading attendance roster...</div>
+                </div>
+              ) : filteredRoster.length === 0 ? (
+                <div className="p-16 text-center text-slate-500 text-sm">
+                  No students found matching your query.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-800/70 text-slate-300 text-xs">
+                        <th className="text-center px-4 py-3 font-bold w-20">Roll No.</th>
+                        <th className="text-left px-5 py-3 font-bold">Student Name</th>
+                        <th className="text-center px-4 py-3 font-bold w-36">Attendance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {filteredRoster.map((student) => {
+                        const roll = String(student.rollNumber);
+                        const status = attendanceMap[roll] || 'PRESENT';
+                        const isAbsent = status === 'ABSENT';
+
+                        return (
+                          <tr
+                            key={student._id || roll}
+                            className={`hover:bg-slate-800/30 transition-colors ${
+                              isAbsent ? 'bg-red-950/15' : ''
+                            }`}
+                          >
+                            {/* 1. Roll No. */}
+                            <td className="px-4 py-3 text-center font-mono font-bold text-slate-200">
+                              {student.rollNumber}
+                            </td>
+
+                            {/* 2. Student Name */}
+                            <td className="px-5 py-3 text-white font-medium">
+                              {student.fullName}
+                              <span className="text-[11px] font-mono text-slate-500 ml-2 hidden sm:inline">
+                                ({student.enrollmentNumber})
+                              </span>
+                            </td>
+
+                            {/* 3. Attendance Toggle Buttons */}
+                            <td className="px-4 py-3 text-center">
+                              <div className="inline-flex rounded-lg p-1 bg-slate-800/90 border border-slate-700/80 gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAttendanceMap((prev) => ({ ...prev, [roll]: 'PRESENT' }));
+                                  }}
+                                  className={`px-3 py-1 rounded text-xs font-bold transition-all flex items-center gap-1 ${
+                                    !isAbsent
+                                      ? 'bg-emerald-600 text-white shadow-sm'
+                                      : 'text-slate-400 hover:text-white'
+                                  }`}
+                                >
+                                  <CheckCircle2 size={12} />
+                                  <span>Present</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAttendanceMap((prev) => ({ ...prev, [roll]: 'ABSENT' }));
+                                  }}
+                                  className={`px-3 py-1 rounded text-xs font-bold transition-all flex items-center gap-1 ${
+                                    isAbsent
+                                      ? 'bg-red-600 text-white shadow-sm'
+                                      : 'text-slate-400 hover:text-white'
+                                  }`}
+                                >
+                                  <XCircle size={12} />
+                                  <span>Absent</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Sticky Bottom Save Bar */}
+            <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl flex items-center justify-between">
+              <div className="text-xs text-slate-400">
+                Default: <strong className="text-emerald-400">Present</strong> • Toggle individual students to <strong className="text-red-400">Absent</strong>.
+              </div>
+              <button
+                onClick={handleSaveAttendance}
+                disabled={saving}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded-lg shadow-lg shadow-emerald-900/30 transition-all flex items-center gap-2"
+              >
+                {saving ? (
+                  <RefreshCw size={15} className="animate-spin" />
+                ) : (
+                  <Check size={16} />
+                )}
+                <span>{saving ? 'Saving...' : 'SAVE ATTENDANCE'}</span>
+              </button>
             </div>
           </div>
         )}
+
+        {/* ─── SCREEN 5: HISTORY & DEFAULTERS VIEW ───────────────────────────── */}
+        {step === 'HISTORY' && (
+          <div className="space-y-6">
+            {/* Tabs Bar */}
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex bg-slate-800 border border-slate-700 rounded-lg p-1">
+                <button
+                  onClick={() => setHistoryTab('sessions')}
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+                    historyTab === 'sessions' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Recorded Sessions ({historyList.length})
+                </button>
+                <button
+                  onClick={() => setHistoryTab('defaulters')}
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    historyTab === 'defaulters' ? 'bg-red-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <ShieldAlert size={13} />
+                  <span>Defaulters (&lt; 75%)</span>
+                  {defaultersList.length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.2 rounded-full bg-red-950 text-white text-[10px] font-mono">
+                      {defaultersList.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              <button
+                onClick={loadHistory}
+                disabled={loadingHistory}
+                className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 flex items-center gap-1.5"
+              >
+                <RefreshCw size={13} className={loadingHistory ? 'animate-spin' : ''} />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            {historyTab === 'sessions' && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                {loadingHistory ? (
+                  <div className="p-16 text-center">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                    <div className="text-slate-400 text-sm">Loading attendance history...</div>
+                  </div>
+                ) : historyList.length === 0 ? (
+                  <div className="p-16 text-center text-slate-500 text-sm">
+                    No attendance sessions recorded yet. Click "Take Attendance" to record the first session.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-800 bg-slate-800/70 text-slate-300 text-xs">
+                          <th className="text-left px-5 py-3.5 font-bold">Type</th>
+                          <th className="text-left px-4 py-3.5 font-bold">Subject</th>
+                          <th className="text-center px-4 py-3.5 font-bold">Batch</th>
+                          <th className="text-left px-4 py-3.5 font-bold">Date &amp; Slot</th>
+                          <th className="text-center px-4 py-3.5 font-bold">Present</th>
+                          <th className="text-center px-4 py-3.5 font-bold">Absent</th>
+                          <th className="text-center px-4 py-3.5 font-bold">Percentage</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {historyList.map((item) => (
+                          <tr key={item.sessionId} className="hover:bg-slate-800/30 transition-colors">
+                            <td className="px-5 py-3.5 font-bold text-white">
+                              <span className={`px-2 py-0.5 rounded text-[11px] font-black uppercase ${
+                                item.attendanceType === 'LECTURE'
+                                  ? 'bg-blue-950 text-blue-300 border border-blue-800/60'
+                                  : 'bg-purple-950 text-purple-300 border border-purple-800/60'
+                              }`}>
+                                {item.attendanceType}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5 font-mono font-bold text-blue-400">
+                              {item.subjectCode}
+                            </td>
+                            <td className="px-4 py-3.5 text-center font-mono font-bold text-slate-300">
+                              {item.batch !== '—' ? (
+                                <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-purple-300">
+                                  Batch {item.batch}
+                                </span>
+                              ) : (
+                                <span className="text-slate-500">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 text-slate-300 font-mono text-xs">
+                              <div>{item.date}</div>
+                              <div className="text-[11px] text-slate-500">{item.slot}</div>
+                            </td>
+                            <td className="px-4 py-3.5 text-center font-bold text-emerald-400 font-mono">
+                              {item.presentCount}
+                            </td>
+                            <td className="px-4 py-3.5 text-center font-bold text-red-400 font-mono">
+                              {item.absentCount}
+                            </td>
+                            <td className="px-4 py-3.5 text-center font-bold font-mono">
+                              <span className={`px-2 py-0.5 rounded text-xs ${
+                                item.percentage >= 75
+                                  ? 'text-emerald-400 bg-emerald-950/40'
+                                  : 'text-red-400 bg-red-950/40'
+                              }`}>
+                                {item.percentage}%
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {historyTab === 'defaulters' && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                {loadingHistory ? (
+                  <div className="p-16 text-center">
+                    <div className="w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                    <div className="text-slate-400 text-sm">Computing defaulter statistics...</div>
+                  </div>
+                ) : defaultersList.length === 0 ? (
+                  <div className="p-16 text-center text-slate-400 text-sm">
+                    <CheckCircle2 size={32} className="text-emerald-400 mx-auto mb-2" />
+                    No attendance defaulters found! All students maintain 75% or higher attendance.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-800 bg-slate-800/70 text-slate-300 text-xs">
+                          <th className="text-center px-4 py-3.5 font-bold w-20">Roll No.</th>
+                          <th className="text-left px-5 py-3.5 font-bold">Student Name</th>
+                          <th className="text-center px-4 py-3.5 font-bold">Batch</th>
+                          <th className="text-center px-4 py-3.5 font-bold">Conducted</th>
+                          <th className="text-center px-4 py-3.5 font-bold">Attended</th>
+                          <th className="text-center px-4 py-3.5 font-bold">Attendance %</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {defaultersList.map((student) => (
+                          <tr key={student.rollNumber} className="hover:bg-slate-800/30 transition-colors bg-red-950/10">
+                            <td className="px-4 py-3.5 text-center font-mono font-bold text-red-300">
+                              {student.rollNumber}
+                            </td>
+                            <td className="px-5 py-3.5 text-white font-medium">
+                              {student.fullName}
+                            </td>
+                            <td className="px-4 py-3.5 text-center font-mono font-bold text-purple-300">
+                              Batch {student.batch}
+                            </td>
+                            <td className="px-4 py-3.5 text-center font-mono text-slate-300">
+                              {student.conducted}
+                            </td>
+                            <td className="px-4 py-3.5 text-center font-mono text-slate-300">
+                              {student.attended}
+                            </td>
+                            <td className="px-4 py-3.5 text-center font-mono font-bold text-red-400">
+                              {student.percentage}%
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
     </FacultyLayout>
   );

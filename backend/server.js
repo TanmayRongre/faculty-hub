@@ -16,7 +16,7 @@ const timetableRoutes = require('./src/routes/timetableRoutes');
 const holidayRoutes = require('./src/routes/holidayRoutes');
 const lectureRoutes = require('./src/routes/lectureRoutes');
 const noticeRoutes = require('./src/routes/noticeRoutes');
-const galleryRoutes = require('./src/routes/galleryRoutes');
+const taskRoutes = require('./src/routes/taskRoutes');
 
 // Connect to MongoDB
 connectDB();
@@ -106,7 +106,7 @@ app.use('/api/timetable', timetableRoutes);
 app.use('/api/holidays', holidayRoutes);
 app.use('/api/lectures', lectureRoutes);
 app.use('/api/notices', noticeRoutes);
-app.use('/api/gallery', galleryRoutes);
+app.use('/api/tasks', taskRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {

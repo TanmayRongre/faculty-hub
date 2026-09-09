@@ -127,13 +127,12 @@ async function seed() {
     seededFacultyProfiles.push(fProfile);
   }
 
-  // 4. Seed the 6 Subjects & Assign Faculty
+  // 4. Seed the 5 Subjects & Assign Faculty
   const subjectFacultyMap = {
     STE: seededFacultyProfiles[0]._id, // HOD
     ACN: seededFacultyProfiles[1]._id, // Permanent Faculty
     OSY: seededFacultyProfiles[2]._id, // Normal Faculty
     SPI: seededFacultyProfiles[1]._id, // Permanent Faculty
-    ITR: seededFacultyProfiles[3]._id, // NCC Administrator
     ENDS: seededFacultyProfiles[0]._id, // HOD
   };
 

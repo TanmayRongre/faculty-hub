@@ -1,229 +1,207 @@
 /**
  * attendanceController.js
  *
- * HTTP layer for all attendance operations.
- * Delegates all business logic to attendanceService.
- * Enforces authorization via middleware.
+ * HTTP layer for all attendance operations in FacultyHub (Redesigned Architecture):
+ *   - LECTURE vs PRACTICAL
+ *   - Batch A, B, C for Practical
+ *   - Strict subject-level authorization and validation
+ *   - Idempotent and batch-safe Google Sheets sync
  */
 
-const Student = require('../models/Student');
 const attendanceService = require('../services/attendance/attendanceService');
-const { ATTENDANCE_CONFIG } = require('../services/attendance/attendanceCalculator');
 
-// ─── Faculty / Admin ──────────────────────────────────────────────────────────
+function handleError(err, res) {
+  console.error('[AttendanceController] Error:', err.message);
+  const status = err.statusCode || (err.message.includes('not eligible') || err.message.includes('not allowed') || err.message.includes('requires a valid batch') ? 422 : 500);
+  return res.status(status).json({
+    success: false,
+    message: err.message || 'Internal attendance error',
+    details: err.details || undefined,
+  });
+}
 
 /**
- * POST /api/attendance/lecture/:lectureId
- * Submit attendance for a lecture session.
- * Present-by-default — only absent students are submitted.
+ * GET /api/attendance/roster
+ * Returns the exact student roster for the chosen attendance context.
+ * Query params:
+ *   - attendanceType: 'LECTURE' | 'PRACTICAL'
+ *   - subjectCode: 'STE' | 'OSY' | 'ENDS' | 'ACN'
+ *   - batch: 'A' | 'B' | 'C' (required if PRACTICAL)
  */
-const submitLectureAttendance = async (req, res) => {
+const getRoster = async (req, res) => {
   try {
-    const { lectureId: paramLectureId } = req.params;
-    const {
-      date,
+    const { attendanceType, subjectCode, batch } = req.query;
+    const result = await attendanceService.getRoster({
+      attendanceType,
       subjectCode,
-      division = 'A',
-      semester = 5,
+      batch: batch || null,
+    });
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    return handleError(err, res);
+  }
+};
+
+/**
+ * POST /api/attendance/session
+ * Saves/Submits an attendance session (SAVE ALL).
+ * Body:
+ *   - attendanceType: 'LECTURE' | 'PRACTICAL'
+ *   - subjectCode: 'STE' | 'OSY' | 'ENDS' | 'ACN'
+ *   - batch: 'A' | 'B' | 'C' | null
+ *   - date: 'YYYY-MM-DD'
+ *   - slot: '09:00 - 10:00'
+ *   - absentEnrollments / absentRolls: array of string
+ *   - records: optional array of { rollNumber, status }
+ */
+const saveAttendanceSession = async (req, res) => {
+  try {
+    const {
+      attendanceType,
+      subjectCode,
+      batch,
+      date,
       slot,
-      absentEnrollments = [],
+      absentEnrollments,
+      absentRolls,
+      records,
+      sessionId,
     } = req.body;
 
-    if (!date) return res.status(400).json({ success: false, message: 'date is required' });
-    if (!subjectCode) return res.status(400).json({ success: false, message: 'subjectCode is required' });
-
-    const result = await attendanceService.submitAttendance({
-      date,
+    const result = await attendanceService.saveAttendanceSession({
+      attendanceType,
       subjectCode,
-      division,
-      semester,
+      batch,
+      date,
       slot,
-      lectureId: paramLectureId !== 'new' ? paramLectureId : undefined,
       absentEnrollments,
-      facultyId: req.user.id,
+      absentRolls,
+      records,
+      sessionId,
+      markedBy: req.user?._id,
     });
 
-    res.status(201).json({ success: true, message: `Attendance ${result.action} successfully`, data: result });
-  } catch (err) {
-    console.error('[Attendance] Submit error:', err.message);
-    res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Failed to save attendance' });
-  }
-};
-
-/**
- * PUT /api/attendance/lecture/:lectureId
- * Edit/update an existing lecture's attendance.
- */
-const updateLectureAttendance = async (req, res) => {
-  try {
-    const { lectureId } = req.params;
-    const { absentEnrollments = [] } = req.body;
-
-    if (!lectureId) return res.status(400).json({ success: false, message: 'lectureId is required' });
-
-    const result = await attendanceService.updateAttendance({
-      lectureId,
-      absentEnrollments,
+    return res.status(201).json({
+      success: true,
+      message: `Attendance saved for ${result.attendanceType} ${result.subjectCode}${result.batch !== '—' ? ` Batch ${result.batch}` : ''}`,
+      data: result,
     });
-
-    res.json({ success: true, message: 'Attendance updated successfully', data: result });
   } catch (err) {
-    console.error('[Attendance] Update error:', err.message);
-    res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Failed to update attendance' });
+    return handleError(err, res);
   }
 };
 
 /**
- * GET /api/attendance/lecture/:lectureId
+ * GET /api/attendance/history
+ * Returns distinct attendance sessions sorted by date.
  */
-const getLectureAttendance = async (req, res) => {
-  try {
-    const { lectureId } = req.params;
-    const records = await attendanceService.getLectureAttendance(lectureId);
-    res.json({ success: true, lectureId, count: records.length, data: records });
-  } catch (err) {
-    console.error('[Attendance] Get lecture error:', err.message);
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
-  }
-};
-
-/**
- * GET /api/attendance/class
- */
-const getClassAttendance = async (req, res) => {
+const getAttendanceHistory = async (req, res) => {
   try {
     const filters = {};
-    if (req.query.subjectCode) filters.subjectCode = req.query.subjectCode.toUpperCase();
-    if (req.query.date) filters.date = req.query.date;
-    if (req.query.lectureId) filters.lectureId = req.query.lectureId;
-    if (req.query.semester) filters.semester = req.query.semester;
-
-    const result = await attendanceService.getClassAttendance(filters);
-    res.json({ success: true, data: result });
-  } catch (err) {
-    console.error('[Attendance] Get class error:', err.message);
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
-  }
-};
-
-/**
- * GET /api/attendance/matrix
- * Returns attendance matrix (Students rows × Lectures columns).
- */
-const getAttendanceMatrix = async (req, res) => {
-  try {
-    const filters = {};
-    if (req.query.subjectCode) filters.subjectCode = req.query.subjectCode.toUpperCase();
-    if (req.query.semester) filters.semester = req.query.semester;
-
-    const result = await attendanceService.getAttendanceMatrix(filters);
-    res.json({ success: true, data: result });
-  } catch (err) {
-    console.error('[Attendance] Matrix error:', err.message);
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
-  }
-};
-
-/**
- * GET /api/attendance/student/:studentId
- */
-const getStudentAttendanceById = async (req, res) => {
-  try {
-    const student = await Student.findById(req.params.studentId)
-      .select('enrollmentNumber')
-      .lean();
-    if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
-
-    const filters = {};
+    if (req.query.attendanceType) filters.attendanceType = req.query.attendanceType;
     if (req.query.subjectCode) filters.subjectCode = req.query.subjectCode;
+    if (req.query.batch) filters.batch = req.query.batch;
+    if (req.query.date) filters.date = req.query.date;
 
-    const result = await attendanceService.getStudentAttendance(student.enrollmentNumber, filters);
-    res.json({ success: true, data: result });
+    const history = await attendanceService.getAttendanceHistory(filters);
+    return res.json({ success: true, count: history.length, data: history });
   } catch (err) {
-    console.error('[Attendance] Get student error:', err.message);
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    return handleError(err, res);
+  }
+};
+
+/**
+ * GET /api/attendance/session/:sessionId
+ * Returns full attendance records for a specific session.
+ */
+const getSessionDetails = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const details = await attendanceService.getSessionDetails(sessionId);
+    return res.json({ success: true, data: details });
+  } catch (err) {
+    return handleError(err, res);
   }
 };
 
 /**
  * GET /api/attendance/defaulters
+ * Calculates defaulters (< 75%) respecting lecture vs practical contexts and batches.
  */
 const getDefaulters = async (req, res) => {
   try {
     const filters = {};
-    if (req.query.subjectCode) filters.subjectCode = req.query.subjectCode.toUpperCase();
-    if (req.query.semester) filters.semester = req.query.semester;
-
-    const result = await attendanceService.getDefaulters(filters);
-    res.json({ success: true, data: result });
-  } catch (err) {
-    console.error('[Attendance] Defaulters error:', err.message);
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
-  }
-};
-
-// ─── Student (own data) ───────────────────────────────────────────────────────
-
-/**
- * GET /api/attendance/me
- */
-const getMyAttendance = async (req, res) => {
-  try {
-    const student = await Student.findOne({ userId: req.user.id })
-      .select('enrollmentNumber')
-      .lean();
-    if (!student) return res.status(404).json({ success: false, message: 'Student profile not found' });
-
-    const filters = {};
+    if (req.query.attendanceType) filters.attendanceType = req.query.attendanceType;
     if (req.query.subjectCode) filters.subjectCode = req.query.subjectCode;
 
-    const result = await attendanceService.getStudentAttendance(student.enrollmentNumber, filters);
-    res.json({
-      success: true,
-      studentName: req.user.name,
-      enrollmentNumber: student.enrollmentNumber,
-      defaulterThreshold: ATTENDANCE_CONFIG.DEFAULTER_THRESHOLD_PERCENT,
-      data: result,
-    });
+    const result = await attendanceService.getDefaulters(filters);
+    return res.json({ success: true, data: result });
   } catch (err) {
-    console.error('[Attendance] Me error:', err.message);
-    const status = err.statusCode || 503;
-    res.status(status).json({ success: false, message: err.message || 'Attendance service unavailable' });
+    return handleError(err, res);
   }
 };
 
-/**
- * GET /api/attendance/summary
- */
-const getAttendanceSummary = async (req, res) => {
-  try {
-    if (req.user.role === 'student') {
-      const student = await Student.findOne({ userId: req.user.id }).select('enrollmentNumber').lean();
-      if (!student) return res.status(404).json({ success: false, message: 'Student profile not found' });
-      const result = await attendanceService.getStudentAttendance(student.enrollmentNumber);
-      return res.json({ success: true, data: result });
-    }
+// ─── Backward Compatibility Handlers ──────────────────────────────────────────
 
-    // Faculty / admin
-    const filters = {};
-    if (req.query.subjectCode) filters.subjectCode = req.query.subjectCode.toUpperCase();
-    if (req.query.date) filters.date = req.query.date;
-    const result = await attendanceService.getClassAttendance(filters);
-    res.json({ success: true, data: result });
+const submitLectureAttendance = async (req, res) => {
+  try {
+    const { lectureId } = req.params;
+    const { date, subjectCode, slot, absentEnrollments = [], absentRolls = [] } = req.body;
+    const result = await attendanceService.saveAttendanceSession({
+      attendanceType: 'LECTURE',
+      subjectCode,
+      batch: null,
+      date,
+      slot: slot || '10:30 - 11:30',
+      sessionId: lectureId !== 'new' ? lectureId : undefined,
+      absentEnrollments,
+      absentRolls,
+      markedBy: req.user?._id,
+    });
+    return res.status(201).json({ success: true, data: result });
   } catch (err) {
-    console.error('[Attendance] Summary error:', err.message);
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    return handleError(err, res);
+  }
+};
+
+const updateLectureAttendance = async (req, res) => {
+  try {
+    const { lectureId } = req.params;
+    const { absentEnrollments = [], absentRolls = [], date, subjectCode, slot } = req.body;
+    const result = await attendanceService.saveAttendanceSession({
+      attendanceType: 'LECTURE',
+      subjectCode,
+      batch: null,
+      date,
+      slot,
+      sessionId: lectureId,
+      absentEnrollments,
+      absentRolls,
+      markedBy: req.user?._id,
+    });
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    return handleError(err, res);
+  }
+};
+
+const getLectureAttendance = async (req, res) => {
+  try {
+    const { lectureId } = req.params;
+    const details = await attendanceService.getSessionDetails(lectureId);
+    return res.json({ success: true, lectureId, count: details.records.length, data: details.records });
+  } catch (err) {
+    return handleError(err, res);
   }
 };
 
 module.exports = {
+  getRoster,
+  saveAttendanceSession,
+  getAttendanceHistory,
+  getSessionDetails,
+  getDefaulters,
   submitLectureAttendance,
   updateLectureAttendance,
   getLectureAttendance,
-  getClassAttendance,
-  getAttendanceMatrix,
-  getStudentAttendanceById,
-  getDefaulters,
-  getMyAttendance,
-  getAttendanceSummary,
 };

@@ -57,22 +57,7 @@ const getStudents = async (req, res) => {
   }
 };
 
-// ─── GET /api/students/me ─────────────────────────────────────────────────────
-const getMyProfile = async (req, res) => {
-  try {
-    const student = await Student.findOne({ userId: req.user._id })
-      .populate('department', 'name code')
-      .populate('userId', 'name email role isActive createdAt');
 
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Student profile not found' });
-    }
-    res.json({ success: true, data: student });
-  } catch (err) {
-    console.error('getMyProfile error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
 
 // ─── GET /api/students/:id ────────────────────────────────────────────────────
 const getStudent = async (req, res) => {
@@ -306,7 +291,6 @@ const deleteStudent = async (req, res) => {
 
 module.exports = {
   getStudents,
-  getMyProfile,
   getStudent,
   createStudent,
   updateStudent,

@@ -4,55 +4,20 @@ const generateToken = require('../utils/generateToken');
 
 /**
  * POST /api/auth/register
- * PUBLIC — creates a student account only.
- * Role is ALWAYS forced to 'student' regardless of request body.
- * Admin/faculty accounts are created by an authenticated admin via /api/auth/admin/create-user.
+ * DECOMMISSIONED — FacultyHub is a Faculty & Admin platform only.
+ * Public registration is disabled.
  */
 const register = async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, errors: errors.array() });
-    }
-
-    const { name, email, password, rollNumber, department, semester, division } = req.body;
-
-    // Force role to student — public registration never elevates to admin/faculty
-    const role = 'student';
-
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      return res.status(409).json({ success: false, message: 'Email already registered' });
-    }
-
-    const user = await User.create({
-      name,
-      email,
-      password,
-      role,
-      rollNumber,
-      department,
-      semester,
-      division,
-    });
-
-    const token = generateToken(user._id);
-
-    return res.status(201).json({
-      success: true,
-      message: 'Registration successful',
-      token,
-      user: user.toJSON(),
-    });
-  } catch (error) {
-    console.error('Register error:', error);
-    return res.status(500).json({ success: false, message: 'Server error during registration' });
-  }
+  return res.status(403).json({
+    success: false,
+    message: 'Public registration is disabled. Faculty accounts are managed by administration.',
+  });
 };
 
 /**
  * POST /api/auth/login
- * Authenticate user and return JWT
+ * Authenticate faculty or admin user and return JWT.
+ * Student logins are rejected with 403 Forbidden.
  */
 const login = async (req, res) => {
   try {
@@ -67,6 +32,14 @@ const login = async (req, res) => {
     const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    // Reject student login attempts — FacultyHub is Faculty/Admin only
+    if (user.role === 'student') {
+      return res.status(403).json({
+        success: false,
+        message: 'Student access has been decommissioned. FacultyHub is a Faculty and Administration platform only.',
+      });
     }
 
     if (!user.isActive) {
@@ -111,8 +84,8 @@ const getMe = async (req, res) => {
 
 /**
  * POST /api/auth/admin/create-user
- * ADMIN ONLY — creates faculty, admin, or student accounts.
- * Used during setup and future Phase 2 user management.
+ * ADMIN ONLY — creates faculty or admin accounts.
+ * Student role creation is removed.
  */
 const adminCreateUser = async (req, res) => {
   try {
@@ -121,22 +94,21 @@ const adminCreateUser = async (req, res) => {
       return res.status(400).json({ success: false, errors: errors.array() });
     }
 
-    const { name, email, password, role, rollNumber, department, semester, division } = req.body;
+    const { name, email, password, role } = req.body;
+
+    if (!['faculty', 'admin'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Role must be either faculty or admin',
+      });
+    }
 
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(409).json({ success: false, message: 'Email already registered' });
     }
 
-    const userData = { name, email, password, role };
-    if (role === 'student') {
-      userData.rollNumber = rollNumber;
-      userData.department = department;
-      userData.semester = semester;
-      userData.division = division;
-    }
-
-    const user = await User.create(userData);
+    const user = await User.create({ name, email, password, role });
 
     return res.status(201).json({
       success: true,

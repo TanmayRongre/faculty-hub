@@ -4,6 +4,7 @@ const Student = require('../models/Student');
 const Subject = require('../models/Subject');
 const User = require('../models/User');
 const Department = require('../models/Department');
+const FacultySubjectAssignment = require('../models/FacultySubjectAssignment');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const buildFacultyQuery = (query) => {
@@ -170,6 +171,16 @@ const createFaculty = async (req, res) => {
     };
 
     const faculty = await Faculty.create(facultyData);
+    if (subjects && subjects.length > 0) {
+      const assignmentDocs = subjects.map((subId) => ({
+        facultyId: faculty._id,
+        subjectId: subId,
+        departmentId: faculty.department,
+        semester: 5,
+        active: true,
+      }));
+      await FacultySubjectAssignment.insertMany(assignmentDocs);
+    }
     await faculty.populate('department', 'name code');
     await faculty.populate('subjects', 'subjectCode subjectName');
     await faculty.populate('userId', 'name email role isActive');
@@ -260,6 +271,94 @@ const updateFacultyStatus = async (req, res) => {
   }
 };
 
+// ─── POST /api/faculty/:id/subjects (Admin: Batch assign subjects) ───────────
+const assignSubjects = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { subjectIds = [] } = req.body;
+
+    const faculty = await Faculty.findById(id).populate('department');
+    if (!faculty) {
+      return res.status(404).json({ success: false, message: 'Faculty not found' });
+    }
+
+    // Validate that all subjectIds exist
+    let validSubjects = [];
+    if (subjectIds.length > 0) {
+      validSubjects = await Subject.find({ _id: { $in: subjectIds } });
+      if (validSubjects.length !== subjectIds.length) {
+        return res.status(400).json({
+          success: false,
+          message: 'One or more provided subject IDs are invalid',
+        });
+      }
+    }
+
+    // Update FacultySubjectAssignment collection:
+    // Remove existing assignments for this faculty
+    await FacultySubjectAssignment.deleteMany({ facultyId: faculty._id });
+
+    // Insert new assignments preventing duplicates
+    if (validSubjects.length > 0) {
+      const assignmentDocs = validSubjects.map((sub) => ({
+        facultyId: faculty._id,
+        subjectId: sub._id,
+        departmentId: faculty.department?._id || sub.department,
+        semester: sub.semester || 5,
+        active: true,
+      }));
+      await FacultySubjectAssignment.insertMany(assignmentDocs);
+    }
+
+    // Update the subjects array on the Faculty document for fast population
+    faculty.subjects = validSubjects.map((s) => s._id);
+    await faculty.save();
+
+    await faculty.populate('department', 'name code');
+    await faculty.populate('subjects', 'subjectCode subjectName semester courseCode');
+    await faculty.populate('userId', 'name email role isActive');
+
+    res.json({
+      success: true,
+      data: faculty,
+      message: `Successfully assigned ${validSubjects.length} subject(s) to ${faculty.fullName}`,
+    });
+  } catch (err) {
+    console.error('assignSubjects error:', err);
+    res.status(500).json({ success: false, message: 'Server error assigning subjects' });
+  }
+};
+
+// ─── GET /api/faculty/me/assigned-subjects (Faculty: view own assigned subjects) ──
+const getMyAssignedSubjects = async (req, res) => {
+  try {
+    const faculty = await Faculty.findOne({ userId: req.user._id })
+      .populate('subjects', 'subjectCode subjectName semester courseCode department')
+      .populate('department', 'name code');
+
+    if (!faculty) {
+      // If admin, return all active subjects
+      if (req.user.role === 'admin') {
+        const allSubjects = await Subject.find({ semester: 5 }).sort({ subjectCode: 1 });
+        return res.json({ success: true, data: allSubjects, isAdmin: true });
+      }
+      return res.status(404).json({ success: false, message: 'Faculty profile not found' });
+    }
+
+    res.json({
+      success: true,
+      data: faculty.subjects || [],
+      department: faculty.department,
+      facultyId: faculty._id,
+      fullName: faculty.fullName,
+      designation: faculty.designation,
+    });
+  } catch (err) {
+    console.error('getMyAssignedSubjects error:', err);
+    res.status(500).json({ success: false, message: 'Server error fetching assigned subjects' });
+  }
+};
+
 module.exports = {
   getFacultyList,
   getMyFacultyProfile,
@@ -267,4 +366,7 @@ module.exports = {
   createFaculty,
   updateFaculty,
   updateFacultyStatus,
+  assignSubjects,
+  getMyAssignedSubjects,
 };
+

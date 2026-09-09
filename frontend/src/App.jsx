@@ -23,20 +23,11 @@ import MarksManagementPage from './pages/faculty/MarksManagementPage';
 import AttendancePage from './pages/faculty/AttendancePage';
 import FacultyTimetablePage from './pages/faculty/FacultyTimetablePage';
 import FacultyNoticesPage from './pages/faculty/FacultyNoticesPage';
-import FacultyGalleryPage from './pages/faculty/FacultyGalleryPage';
+import TaskManagementPage from './pages/faculty/TaskManagementPage';
 
-// Student pages
-import StudentDashboard from './pages/student/StudentDashboard';
-import StudentProfilePage from './pages/student/StudentProfilePage';
-import StudentMarksPage from './pages/student/StudentMarksPage';
-import StudentAttendancePage from './pages/student/StudentAttendancePage';
-import StudentTimetablePage from './pages/student/StudentTimetablePage';
-import StudentNoticesPage from './pages/student/StudentNoticesPage';
-import StudentGalleryPage from './pages/student/StudentGalleryPage';
-
-// Root redirect
+// Root redirect — FacultyHub is a Faculty & Admin only platform
 const RootRedirect = () => {
-  const { isAuthenticated, user, loading } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
@@ -45,7 +36,6 @@ const RootRedirect = () => {
     );
   }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (user?.role === 'student') return <Navigate to="/student/dashboard" replace />;
   return <Navigate to="/faculty/dashboard" replace />;
 };
 
@@ -57,123 +47,188 @@ const App = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: {
-            background: '#1e293b',
-            color: '#f1f5f9',
-            border: '1px solid #334155',
-            fontSize: '14px',
-          },
-          success: { iconTheme: { primary: '#22c55e', secondary: '#1e293b' } },
-          error: { iconTheme: { primary: '#ef4444', secondary: '#1e293b' } },
-        }}
-      />
-      <Routes>
-        {/* Public */}
-        <Route path="/login" element={<LoginPage />} />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: '#1e293b',
+              color: '#f1f5f9',
+              border: '1px solid #334155',
+              fontSize: '14px',
+            },
+            success: { iconTheme: { primary: '#22c55e', secondary: '#1e293b' } },
+            error: { iconTheme: { primary: '#ef4444', secondary: '#1e293b' } },
+          }}
+        />
+        <Routes>
+          {/* Public Login */}
+          <Route path="/login" element={<LoginPage />} />
 
-        {/* ── Faculty / Admin ───────────────────────────────────── */}
-        <Route path="/faculty/dashboard" element={
-          <ProtectedRoute roles={['faculty', 'admin']}><FacultyDashboard /></ProtectedRoute>
-        } />
+          {/* ── Faculty / Admin Workspaces ───────────────────────── */}
+          <Route
+            path="/faculty/dashboard"
+            element={
+              <ProtectedRoute roles={['faculty', 'admin']}>
+                <FacultyDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Students management */}
-        <Route path="/faculty/students" element={
-          <ProtectedRoute roles={['faculty', 'admin']}><StudentsPage /></ProtectedRoute>
-        } />
-        <Route path="/faculty/students/new" element={
-          <ProtectedRoute roles={['admin']}><StudentFormPage /></ProtectedRoute>
-        } />
-        <Route path="/faculty/students/:id" element={
-          <ProtectedRoute roles={['faculty', 'admin']}><StudentDetailPage /></ProtectedRoute>
-        } />
-        <Route path="/faculty/students/:id/edit" element={
-          <ProtectedRoute roles={['admin']}><StudentFormPage /></ProtectedRoute>
-        } />
+          {/* Academic Student Records Management (Faculty/Admin only) */}
+          <Route
+            path="/faculty/students"
+            element={
+              <ProtectedRoute roles={['faculty', 'admin']}>
+                <StudentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/faculty/students/new"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <StudentFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/faculty/students/:id"
+            element={
+              <ProtectedRoute roles={['faculty', 'admin']}>
+                <StudentDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/faculty/students/:id/edit"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <StudentFormPage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Faculty management */}
-        <Route path="/faculty/faculty" element={
-          <ProtectedRoute roles={['faculty', 'admin']}><FacultyListPage /></ProtectedRoute>
-        } />
-        <Route path="/faculty/faculty/new" element={
-          <ProtectedRoute roles={['admin']}><FacultyFormPage /></ProtectedRoute>
-        } />
-        <Route path="/faculty/faculty/:id" element={
-          <ProtectedRoute roles={['faculty', 'admin']}><FacultyDetailPage /></ProtectedRoute>
-        } />
-        <Route path="/faculty/faculty/:id/edit" element={
-          <ProtectedRoute roles={['admin']}><FacultyFormPage /></ProtectedRoute>
-        } />
+          {/* Faculty Management (Admin only / Directory for Faculty) */}
+          <Route
+            path="/faculty/faculty"
+            element={
+              <ProtectedRoute roles={['faculty', 'admin']}>
+                <FacultyListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/faculty/faculty/new"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <FacultyFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/faculty/faculty/:id"
+            element={
+              <ProtectedRoute roles={['faculty', 'admin']}>
+                <FacultyDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/faculty/faculty/:id/edit"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <FacultyFormPage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Academic structure */}
-        <Route path="/faculty/academic" element={
-          <ProtectedRoute roles={['faculty', 'admin']}><AcademicStructurePage /></ProtectedRoute>
-        } />
-        <Route path="/faculty/subjects" element={
-          <ProtectedRoute roles={['faculty', 'admin']}><SubjectsPage /></ProtectedRoute>
-        } />
+          {/* Academic Structure & Subjects */}
+          <Route
+            path="/faculty/academic"
+            element={
+              <ProtectedRoute roles={['faculty', 'admin']}>
+                <AcademicStructurePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/faculty/subjects"
+            element={
+              <ProtectedRoute roles={['faculty', 'admin']}>
+                <SubjectsPage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Google Sheets integration — admin only */}
-        <Route path="/faculty/sheets" element={
-          <ProtectedRoute roles={['admin']}><SheetsStatusPage /></ProtectedRoute>
-        } />
+          {/* Google Sheets Integration — Admin only */}
+          <Route
+            path="/faculty/sheets"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <SheetsStatusPage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Marks management — faculty + admin */}
-        <Route path="/faculty/marks" element={
-          <ProtectedRoute roles={['faculty', 'admin']}><MarksManagementPage /></ProtectedRoute>
-        } />
+          {/* Marks Management (MSBTE Scheme) — Faculty + Admin */}
+          <Route
+            path="/faculty/marks"
+            element={
+              <ProtectedRoute roles={['faculty', 'admin']}>
+                <MarksManagementPage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Fast Attendance — faculty + admin */}
-        <Route path="/faculty/attendance" element={
-          <ProtectedRoute roles={['faculty', 'admin']}><AttendancePage /></ProtectedRoute>
-        } />
+          {/* Fast Attendance Management — Faculty + Admin */}
+          <Route
+            path="/faculty/attendance"
+            element={
+              <ProtectedRoute roles={['faculty', 'admin']}>
+                <AttendancePage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Smart Scheduler & Timetable — faculty + admin */}
-        <Route path="/faculty/timetable" element={
-          <ProtectedRoute roles={['faculty', 'admin']}><FacultyTimetablePage /></ProtectedRoute>
-        } />
+          {/* Smart Scheduler & Timetable — Faculty + Admin */}
+          <Route
+            path="/faculty/timetable"
+            element={
+              <ProtectedRoute roles={['faculty', 'admin']}>
+                <FacultyTimetablePage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Campus Notices & Circulars — faculty + admin */}
-        <Route path="/faculty/notices" element={
-          <ProtectedRoute roles={['faculty', 'admin']}><FacultyNoticesPage /></ProtectedRoute>
-        } />
+          {/* Campus Notices & Announcements — Faculty + Admin */}
+          <Route
+            path="/faculty/notices"
+            element={
+              <ProtectedRoute roles={['faculty', 'admin']}>
+                <FacultyNoticesPage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Extracurricular Activity Moderation — faculty + admin */}
-        <Route path="/faculty/gallery" element={
-          <ProtectedRoute roles={['faculty', 'admin']}><FacultyGalleryPage /></ProtectedRoute>
-        } />
+          {/* Task Management — Faculty + Admin */}
+          <Route
+            path="/faculty/tasks"
+            element={
+              <ProtectedRoute roles={['faculty', 'admin']}>
+                <TaskManagementPage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* ── Student ───────────────────────────────────────────── */}
-        <Route path="/student/dashboard" element={
-          <ProtectedRoute roles={['student']}><StudentDashboard /></ProtectedRoute>
-        } />
-        <Route path="/student/profile" element={
-          <ProtectedRoute roles={['student']}><StudentProfilePage /></ProtectedRoute>
-        } />
-        <Route path="/student/marks" element={
-          <ProtectedRoute roles={['student']}><StudentMarksPage /></ProtectedRoute>
-        } />
-        <Route path="/student/attendance" element={
-          <ProtectedRoute roles={['student']}><StudentAttendancePage /></ProtectedRoute>
-        } />
-        <Route path="/student/timetable" element={
-          <ProtectedRoute roles={['student']}><StudentTimetablePage /></ProtectedRoute>
-        } />
-        <Route path="/student/notices" element={
-          <ProtectedRoute roles={['student']}><StudentNoticesPage /></ProtectedRoute>
-        } />
-        <Route path="/student/gallery" element={
-          <ProtectedRoute roles={['student']}><StudentGalleryPage /></ProtectedRoute>
-        } />
+          {/* Decommissioned Student Routes Fallback — redirect to login without blank screen */}
+          <Route path="/student/*" element={<Navigate to="/login" replace />} />
 
-        {/* Root & catch-all */}
-        <Route path="/" element={<RootRedirect />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AuthProvider>
-  </BrowserRouter>
+          {/* Root & Catch-all */}
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   );
 };
 

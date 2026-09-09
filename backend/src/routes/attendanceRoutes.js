@@ -1,56 +1,75 @@
 /**
  * attendanceRoutes.js
  *
- * /api/attendance route definitions.
- * Authorization:
- *   - Students: GET /me, GET /summary
- *   - Faculty/Admin: all other endpoints
+ * /api/attendance route definitions for Redesigned Attendance Architecture.
+ * Enforces authentication, role checks ('faculty', 'admin'), and subject authorization.
  */
 
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
+const { authorizeSubjectAccess } = require('../middleware/subjectAccess');
 const {
+  getRoster,
+  saveAttendanceSession,
+  getAttendanceHistory,
+  getSessionDetails,
+  getDefaulters,
   submitLectureAttendance,
   updateLectureAttendance,
   getLectureAttendance,
-  getClassAttendance,
-  getAttendanceMatrix,
-  getStudentAttendanceById,
-  getDefaulters,
-  getMyAttendance,
-  getAttendanceSummary,
 } = require('../controllers/attendanceController');
 
-// ─── Student-only routes ──────────────────────────────────────────────────────
+// ─── Active Redesigned Attendance Endpoints ───────────────────────────────────
 
-/** GET /api/attendance/me — student's own attendance */
-router.get('/me', protect, authorize('student'), getMyAttendance);
+/** GET /api/attendance/roster — fetches exact student slice for type/subject/batch */
+router.get(
+  '/roster',
+  protect,
+  authorize('faculty', 'admin'),
+  authorizeSubjectAccess('subjectCode'),
+  getRoster
+);
 
-/** GET /api/attendance/summary — summary for authenticated user */
-router.get('/summary', protect, authorize('student', 'faculty', 'admin'), getAttendanceSummary);
+/** POST /api/attendance/session — saves attendance session (SAVE ALL) */
+router.post(
+  '/session',
+  protect,
+  authorize('faculty', 'admin'),
+  authorizeSubjectAccess('subjectCode'),
+  saveAttendanceSession
+);
 
-// ─── Faculty / Admin routes ───────────────────────────────────────────────────
+/** GET /api/attendance/history — distinct session listing with filters */
+router.get(
+  '/history',
+  protect,
+  authorize('faculty', 'admin'),
+  authorizeSubjectAccess('subjectCode'),
+  getAttendanceHistory
+);
 
-/** GET /api/attendance/matrix — attendance matrix table */
-router.get('/matrix', protect, authorize('faculty', 'admin'), getAttendanceMatrix);
+/** GET /api/attendance/session/:sessionId — full attendance records for session */
+router.get(
+  '/session/:sessionId',
+  protect,
+  authorize('faculty', 'admin'),
+  getSessionDetails
+);
 
-/** GET /api/attendance/defaulters */
-router.get('/defaulters', protect, authorize('faculty', 'admin'), getDefaulters);
+/** GET /api/attendance/defaulters — defaulter list (< 75%) */
+router.get(
+  '/defaulters',
+  protect,
+  authorize('faculty', 'admin'),
+  authorizeSubjectAccess('subjectCode'),
+  getDefaulters
+);
 
-/** GET /api/attendance/class */
-router.get('/class', protect, authorize('faculty', 'admin'), getClassAttendance);
+// ─── Backward Compatibility Routes ────────────────────────────────────────────
 
-/** GET /api/attendance/student/:studentId */
-router.get('/student/:studentId', protect, authorize('faculty', 'admin'), getStudentAttendanceById);
-
-/** GET /api/attendance/lecture/:lectureId — load existing attendance for edit */
 router.get('/lecture/:lectureId', protect, authorize('faculty', 'admin'), getLectureAttendance);
-
-/** POST /api/attendance/lecture/:lectureId — submit new attendance */
-router.post('/lecture/:lectureId', protect, authorize('faculty', 'admin'), submitLectureAttendance);
-
-/** PUT /api/attendance/lecture/:lectureId — edit existing attendance */
+router.post('/lecture/:lectureId', protect, authorize('faculty', 'admin'), authorizeSubjectAccess('subjectCode'), submitLectureAttendance);
 router.put('/lecture/:lectureId', protect, authorize('faculty', 'admin'), updateLectureAttendance);
 
 module.exports = router;

@@ -1,312 +1,497 @@
 /**
  * attendanceService.js
  *
- * Orchestrates attendance operations for FacultyHub:
- *   - Resolves MongoDB students / subjects
- *   - Delegates to academicDataService for Google Sheets I/O
- *   - Matrix View & Fast Attendance support
+ * Orchestrates Attendance for FacultyHub (Redesigned Architecture):
+ *   - Primary Types: LECTURE and PRACTICAL
+ *   - Subjects: Strictly STE, OSY, ENDS, ACN
+ *   - Practical Batches:
+ *       • Batch A: Roll 1–24 (24 students)
+ *       • Batch B: Roll 25–47 (23 students)
+ *       • Batch C: Roll 48–68 (21 students)
+ *   - MongoDB Attendance storage with atomic batch write
+ *   - Google Sheets synchronization with 16 dedicated worksheets:
+ *       • ATT-LEC-STE, ATT-LEC-OSY, ATT-LEC-ENDS, ATT-LEC-ACN
+ *       • ATT-PR-STE-A, ATT-PR-STE-B, ATT-PR-STE-C
+ *       • ATT-PR-OSY-A, ... ATT-PR-ACN-C
+ *   - Zero cross-contamination between sheets
+ *   - Separate context for lecture vs practical calculations
+ *   - Defaulter rule: < 75% (75% exactly is not defaulter)
  */
 
 const Student = require('../../models/Student');
 const Subject = require('../../models/Subject');
-const academicDataService = require('../../integrations/googleSheets/academicDataService');
+const Attendance = require('../../models/Attendance');
+const sheetsService = require('../../integrations/googleSheets/googleSheetsService');
 const {
-  computeAttendanceStats,
-  groupByLecture,
-  buildAttendanceRecords,
-  ATTENDANCE_CONFIG,
-} = require('./attendanceCalculator');
+  ATTENDANCE_SUBJECTS,
+  PRACTICAL_BATCHES,
+  BATCH_DEFINITIONS,
+  getBatchForRoll,
+  validateBatchRoll,
+  isValidAttendanceSubject,
+  getAttendanceWorksheetName,
+} = require('../../integrations/googleSheets/spreadsheetConfig');
 
 function validateDate(dateStr) {
-  if (!dateStr) throw Object.assign(new Error('date is required'), { statusCode: 400 });
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) throw Object.assign(new Error(`Invalid date: "${dateStr}"`), { statusCode: 400 });
-  return d.toISOString().split('T')[0];
-}
-
-function generateLectureId(date, subjectCode, division = 'A', slot = '1') {
-  const d = date.replace(/-/g, '');
-  return `${d}-${subjectCode.toUpperCase()}-${(division || 'A').toUpperCase()}-${slot}`.replace(/\s+/g, '');
-}
-
-async function resolveSubject(subjectCode) {
-  const subject = await Subject.findOne({ subjectCode: subjectCode.toUpperCase().trim() })
-    .select('subjectCode subjectName semester')
-    .lean();
-  if (!subject) {
-    const err = new Error(`Subject not found: ${subjectCode}`);
-    err.statusCode = 404;
-    throw err;
-  }
-  return subject;
-}
-
-async function getStudentsForClass({ semester = 5, division, batch } = {}) {
-  const query = { status: 'active' };
-  if (semester) query.semester = Number(semester);
-
-  // In 5th semester Computer Engineering, all 68 students share a single common class.
-  // Only filter by division if students in the DB actually have division populated.
-  if (division && division !== 'COMMON' && division !== 'ALL') {
-    const hasDivision = await Student.exists({
-      status: 'active',
-      semester: Number(semester),
-      division: division.toUpperCase(),
-    });
-    if (hasDivision) {
-      query.division = division.toUpperCase();
-    }
-  }
-
-  if (batch) {
-    const hasBatch = await Student.exists({
-      status: 'active',
-      semester: Number(semester),
-      batch: batch.toUpperCase(),
-    });
-    if (hasBatch) {
-      query.batch = batch.toUpperCase();
-    }
-  }
-
-  const students = await Student.find(query)
-    .select('enrollmentNumber rollNumber fullName semester division batch')
-    .collation({ locale: 'en', numericOrdering: true })
-    .sort({ rollNumber: 1 })
-    .lean();
-  return students;
-}
-
-/**
- * Submits attendance for a lecture session (Present-by-default).
- */
-async function submitAttendance(params) {
-  const {
-    date: rawDate,
-    subjectCode,
-    division = 'A',
-    semester = 5,
-    slot = '1',
-    absentEnrollments = [],
-    facultyId,
-  } = params;
-
-  const date = validateDate(rawDate);
-  const subject = await resolveSubject(subjectCode);
-  const lectureId = params.lectureId || generateLectureId(date, subject.subjectCode, division, slot);
-
-  const existing = await academicDataService.getAllAttendance({ lectureId });
-
-  if (existing.length > 0) {
-    return updateAttendance({ lectureId, date, subjectCode: subject.subjectCode, division, semester, absentEnrollments, facultyId });
-  }
-
-  const students = await getStudentsForClass({ semester, division });
-  if (students.length === 0) {
-    const err = new Error('No active students found for the specified class');
+  if (!dateStr) {
+    const err = new Error('Date is required');
     err.statusCode = 400;
     throw err;
   }
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) {
+    const err = new Error(`Invalid date format: "${dateStr}". Expected YYYY-MM-DD`);
+    err.statusCode = 400;
+    throw err;
+  }
+  return d.toISOString().split('T')[0];
+}
 
-  const absentSet = new Set(absentEnrollments.map((e) => e.toUpperCase()));
-  const records = buildAttendanceRecords(students, absentSet, {
-    lectureId,
-    date,
-    subjectCode: subject.subjectCode,
-    subjectName: subject.subjectName,
+function normalizeType(type) {
+  const t = String(type || '').trim().toUpperCase();
+  if (t === 'LECTURE' || t === 'LEC') return 'LECTURE';
+  if (t === 'PRACTICAL' || t === 'PR') return 'PRACTICAL';
+  const err = new Error(`Invalid attendance type: "${type}". Allowed types: Lecture, Practical`);
+  err.statusCode = 400;
+  throw err;
+}
+
+function normalizeSubject(subCode) {
+  const s = String(subCode || '').trim().toUpperCase();
+  if (!isValidAttendanceSubject(s)) {
+    const err = new Error(
+      `Invalid attendance subject: "${subCode}". Allowed subjects for attendance: ${ATTENDANCE_SUBJECTS.join(', ')}`
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+  return s;
+}
+
+function normalizeBatch(type, batch) {
+  if (type === 'LECTURE') {
+    if (batch !== null && batch !== undefined && String(batch).trim() !== '' && String(batch).trim() !== '—') {
+      const err = new Error(`Batch selection is not allowed for Lecture attendance. Lectures are common for all 68 students.`);
+      err.statusCode = 422;
+      throw err;
+    }
+    return null;
+  }
+
+  if (type === 'PRACTICAL') {
+    const b = String(batch || '').trim().toUpperCase();
+    if (!PRACTICAL_BATCHES.includes(b)) {
+      const err = new Error(
+        `Practical attendance requires a valid batch (A, B, or C). Received: "${batch || 'none'}"`
+      );
+      err.statusCode = 422;
+      throw err;
+    }
+    return b;
+  }
+
+  return null;
+}
+
+/**
+ * Returns student roster for the selected attendance context:
+ * - Lecture: all 68 students
+ * - Practical A: Roll 1–24 (24 students)
+ * - Practical B: Roll 25–47 (23 students)
+ * - Practical C: Roll 48–68 (21 students)
+ */
+async function getRoster({ attendanceType, subjectCode, batch = null }) {
+  const type = normalizeType(attendanceType);
+  const sub = normalizeSubject(subjectCode);
+  const validatedBatch = normalizeBatch(type, batch);
+
+  // Load all 68 active students sorted numerically
+  const allStudents = await Student.find({ semester: 5, status: 'active' })
+    .collation({ locale: 'en', numericOrdering: true })
+    .sort({ rollNumber: 1 })
+    .select('_id rollNumber enrollmentNumber fullName department semester batch')
+    .lean();
+
+  if (type === 'LECTURE') {
+    return {
+      attendanceType: 'LECTURE',
+      subjectCode: sub,
+      batch: null,
+      totalStudents: allStudents.length,
+      students: allStudents,
+    };
+  }
+
+  // PRACTICAL: Filter by batch
+  const batchStudents = allStudents.filter((s) => {
+    const r = Number(s.rollNumber);
+    const def = BATCH_DEFINITIONS[validatedBatch];
+    return r >= def.minRoll && r <= def.maxRoll;
   });
 
-  await academicDataService.writeAttendanceBatch(records);
-
-  const presentCount = records.filter((r) => r.status === 'Present').length;
-  const absentCount = records.filter((r) => r.status === 'Absent').length;
-
   return {
-    lectureId,
-    action: 'created',
-    saved: records.length,
-    present: presentCount,
-    absent: absentCount,
-    students: records.map((r) => ({ enrollmentNumber: r.enrollmentNumber, rollNumber: r.rollNumber, status: r.status })),
+    attendanceType: 'PRACTICAL',
+    subjectCode: sub,
+    batch: validatedBatch,
+    totalStudents: batchStudents.length,
+    students: batchStudents,
   };
 }
 
 /**
- * Updates/edits attendance for an existing lecture.
+ * Generates deterministic session ID
  */
-async function updateAttendance(params) {
-  const { lectureId, absentEnrollments = [] } = params;
+function generateSessionId(attendanceType, subjectCode, batch, dateStr, slot = '1') {
+  const d = dateStr.replace(/-/g, '');
+  const cleanSlot = String(slot || '1').replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '');
+  if (attendanceType === 'LECTURE') {
+    return `LEC-${subjectCode}-${d}-${cleanSlot}`;
+  }
+  return `PR-${subjectCode}-${batch}-${d}-${cleanSlot}`;
+}
 
-  const lectureRows = await academicDataService.getAllAttendance({ lectureId });
-  if (lectureRows.length === 0) {
-    const err = new Error(`No attendance found for lectureId: ${lectureId}`);
+/**
+ * Submits/Saves an entire attendance session (SAVE ALL).
+ * Validates roster, saves to MongoDB, updates Google Sheets.
+ */
+async function saveAttendanceSession(params) {
+  const {
+    attendanceType: rawType,
+    subjectCode: rawSubject,
+    batch: rawBatch = null,
+    date: rawDate,
+    slot = rawType && String(rawType).toUpperCase().includes('PR') ? '01:50 - 03:50' : '10:30 - 11:30',
+    absentEnrollments = [],
+    absentRolls = [],
+    records = [],
+    markedBy = null,
+  } = params;
+
+  const attendanceType = normalizeType(rawType);
+  const subjectCode = normalizeSubject(rawSubject);
+  const batch = normalizeBatch(attendanceType, rawBatch);
+  const date = validateDate(rawDate);
+
+  // 1. Resolve Subject document
+  const subjectDoc = await Subject.findOne({ subjectCode })
+    .select('_id subjectCode subjectName')
+    .lean();
+
+  if (!subjectDoc) {
+    const err = new Error(`Subject ${subjectCode} not found in database`);
     err.statusCode = 404;
     throw err;
   }
 
-  const subjectCode = lectureRows[0].subjectCode;
-  const date = lectureRows[0].date;
-  const absentSet = new Set(absentEnrollments.map((e) => e.toUpperCase()));
+  // 2. Fetch expected roster
+  const rosterResult = await getRoster({ attendanceType, subjectCode, batch });
+  const expectedStudents = rosterResult.students;
+  const expectedRollMap = new Map();
+  const expectedEnrollMap = new Map();
 
-  const studentAttendanceList = lectureRows.map((r) => {
-    const isAbsent =
-      absentSet.has((r.enrollmentNumber || '').toUpperCase()) ||
-      absentSet.has(String(r.rollNumber || '').toUpperCase());
-    return {
-      rollNumber: r.rollNumber,
-      enrollmentNumber: r.enrollmentNumber,
-      status: isAbsent ? 'Absent' : 'Present',
-    };
-  });
-
-  await academicDataService.updateSubjectAttendance(subjectCode, lectureId, date, studentAttendanceList);
-
-  const presentCount = studentAttendanceList.filter((r) => r.status === 'Present').length;
-  const absentCount = studentAttendanceList.filter((r) => r.status === 'Absent').length;
-
-  return {
-    lectureId,
-    action: 'updated',
-    saved: studentAttendanceList.length,
-    present: presentCount,
-    absent: absentCount,
-  };
-}
-
-async function rewriteAttendanceSheet(records) {
-  await academicDataService.writeAttendanceBatch(records);
-}
-
-async function getLectureAttendance(lectureId) {
-  return academicDataService.getAllAttendance({ lectureId });
-}
-
-async function getStudentAttendance(enrollmentNumber, filters = {}) {
-  const records = await academicDataService.getAttendanceByEnrollment(enrollmentNumber, filters);
-  const { subjects, overall } = computeAttendanceStats(records);
-
-  return {
-    enrollmentNumber,
-    records,
-    subjects,
-    overall,
-    defaulterThreshold: ATTENDANCE_CONFIG.DEFAULTER_THRESHOLD_PERCENT,
-  };
-}
-
-async function getClassAttendance(filters = {}) {
-  const records = await academicDataService.getAllAttendance(filters);
-
-  const byStudent = {};
-  for (const rec of records) {
-    const enroll = rec.enrollmentNumber;
-    if (!enroll) continue;
-    if (!byStudent[enroll]) {
-      byStudent[enroll] = { enrollmentNumber: enroll, rollNumber: rec.rollNumber, records: [] };
-    }
-    byStudent[enroll].records.push(rec);
+  for (const s of expectedStudents) {
+    expectedRollMap.set(String(s.rollNumber).trim(), s);
+    expectedEnrollMap.set(String(s.enrollmentNumber).toUpperCase().trim(), s);
   }
 
-  const studentSummaries = Object.values(byStudent).map((s) => {
-    const { overall } = computeAttendanceStats(s.records);
-    return {
-      enrollmentNumber: s.enrollmentNumber,
-      rollNumber: s.rollNumber,
-      ...overall,
-    };
-  });
+  // 3. Validate student eligibility (Strict Batch boundary enforcement)
+  const absentEnrollSet = new Set(absentEnrollments.map((e) => String(e).toUpperCase().trim()));
+  const absentRollSet = new Set(absentRolls.map((r) => String(r).trim()));
 
-  const defaulters = studentSummaries.filter((s) => s.isDefaulter);
-  const lectureGroups = groupByLecture(records);
-  const totalLectures = Object.keys(lectureGroups).length;
+  if (Array.isArray(records) && records.length > 0) {
+    for (const rec of records) {
+      const roll = String(rec.rollNumber || rec.rollNo || '').trim();
+      const enroll = String(rec.enrollmentNumber || '').toUpperCase().trim();
+
+      // Check if student belongs to the allowed roster
+      const isAllowed =
+        (roll && expectedRollMap.has(roll)) || (enroll && expectedEnrollMap.has(enroll));
+
+      if (!isAllowed) {
+        const err = new Error(
+          `Student with Roll ${roll || enroll} is not eligible for ${attendanceType} ${subjectCode}${batch ? ` Batch ${batch}` : ''}.`
+        );
+        err.statusCode = 422;
+        throw err;
+      }
+
+      const status = String(rec.status || '').toUpperCase();
+      if (status === 'ABSENT' || status === 'A') {
+        if (roll) absentRollSet.add(roll);
+        if (enroll) absentEnrollSet.add(enroll);
+      }
+    }
+  }
+
+  // Check manual absentRolls for illegal students
+  for (const roll of absentRollSet) {
+    if (!expectedRollMap.has(roll)) {
+      const err = new Error(
+        `Roll number ${roll} is not part of ${attendanceType} ${subjectCode}${batch ? ` Batch ${batch}` : ''}`
+      );
+      err.statusCode = 422;
+      throw err;
+    }
+  }
+
+  // 4. Build Attendance documents for all students in the roster (Present-by-default)
+  const sessionId = params.sessionId || generateSessionId(attendanceType, subjectCode, batch, date, slot);
+
+  const attendanceDocs = [];
+  const sheetsStudentList = [];
+  let presentCount = 0;
+  let absentCount = 0;
+
+  for (const s of expectedStudents) {
+    const roll = String(s.rollNumber).trim();
+    const enroll = String(s.enrollmentNumber).toUpperCase().trim();
+
+    const isAbsent = absentRollSet.has(roll) || absentEnrollSet.has(enroll);
+    const status = isAbsent ? 'ABSENT' : 'PRESENT';
+
+    if (isAbsent) absentCount++;
+    else presentCount++;
+
+    attendanceDocs.push({
+      attendanceType,
+      subjectId: subjectDoc._id,
+      subjectCode,
+      batch,
+      date,
+      sessionId,
+      slot,
+      studentId: s._id,
+      rollNumber: roll,
+      enrollmentNumber: enroll,
+      status,
+      markedBy,
+    });
+
+    sheetsStudentList.push({
+      rollNumber: roll,
+      status: isAbsent ? 'Absent' : 'Present',
+    });
+  }
+
+  // 5. Atomic Upsert into MongoDB Attendance collection
+  const bulkOps = attendanceDocs.map((doc) => ({
+    updateOne: {
+      filter: { sessionId: doc.sessionId, studentId: doc.studentId },
+      update: { $set: doc },
+      upsert: true,
+    },
+  }));
+
+  await Attendance.bulkWrite(bulkOps);
+
+  // 6. Update target Google Sheets worksheet with guaranteed zero cross-contamination
+  let sheetSyncResult = null;
+  try {
+    sheetSyncResult = await sheetsService.updateAttendanceSession(
+      attendanceType,
+      subjectCode,
+      batch,
+      sessionId,
+      date,
+      sheetsStudentList
+    );
+  } catch (sheetErr) {
+    console.warn(`[AttendanceService] Google Sheets sync warning for ${sessionId}:`, sheetErr.message);
+  }
 
   return {
-    records,
-    totalRecords: records.length,
-    totalLectures,
-    studentSummaries,
-    defaulters,
-    defaulterThreshold: ATTENDANCE_CONFIG.DEFAULTER_THRESHOLD_PERCENT,
+    success: true,
+    sessionId,
+    attendanceType,
+    subjectCode,
+    batch: batch || '—',
+    date,
+    slot,
+    total: expectedStudents.length,
+    present: presentCount,
+    absent: absentCount,
+    sheetName: sheetSyncResult?.sheetName || getAttendanceWorksheetName(attendanceType, subjectCode, batch),
   };
-}
-
-async function getDefaulters(filters = {}) {
-  const { studentSummaries, defaulters, defaulterThreshold } = await getClassAttendance(filters);
-  return { defaulters, allStudents: studentSummaries.length, defaulterThreshold };
 }
 
 /**
- * Returns structured attendance matrix for frontend table rendering.
- * Matrix layout:
- *   Columns: distinct lectures sorted by date
- *   Rows: students with status per lecture column
+ * Retrieves past attendance sessions for history view
  */
-async function getAttendanceMatrix(filters = {}) {
-  const sem = filters.semester ? Number(filters.semester) : 5;
-  const students = await Student.find({ status: 'active', semester: sem })
-    .select('enrollmentNumber rollNumber fullName batch')
-    .collation({ locale: 'en', numericOrdering: true })
+async function getAttendanceHistory(filters = {}) {
+  const query = {};
+  if (filters.attendanceType) query.attendanceType = normalizeType(filters.attendanceType);
+  if (filters.subjectCode) query.subjectCode = normalizeSubject(filters.subjectCode);
+  if (filters.batch) query.batch = filters.batch.toUpperCase();
+  if (filters.date) query.date = filters.date;
+
+  const sessions = await Attendance.aggregate([
+    { $match: query },
+    {
+      $group: {
+        _id: '$sessionId',
+        attendanceType: { $first: '$attendanceType' },
+        subjectCode: { $first: '$subjectCode' },
+        batch: { $first: '$batch' },
+        date: { $first: '$date' },
+        slot: { $first: '$slot' },
+        createdAt: { $first: '$createdAt' },
+        totalStudents: { $sum: 1 },
+        presentCount: {
+          $sum: {
+            $cond: [{ $in: ['$status', ['PRESENT', 'Present']] }, 1, 0],
+          },
+        },
+        absentCount: {
+          $sum: {
+            $cond: [{ $in: ['$status', ['ABSENT', 'Absent']] }, 1, 0],
+          },
+        },
+      },
+    },
+    { $sort: { date: -1, createdAt: -1 } },
+  ]);
+
+  return sessions.map((s) => ({
+    sessionId: s._id,
+    attendanceType: s.attendanceType,
+    subjectCode: s.subjectCode,
+    batch: s.batch || '—',
+    date: s.date,
+    slot: s.slot || (s.attendanceType === 'PRACTICAL' ? '01:50 - 03:50' : '10:30 - 11:30'),
+    totalStudents: s.totalStudents,
+    presentCount: s.presentCount,
+    absentCount: s.absentCount,
+    percentage: s.totalStudents > 0 ? Math.round((s.presentCount / s.totalStudents) * 100) : 0,
+  }));
+}
+
+/**
+ * Returns full attendance details for a specific session
+ */
+async function getSessionDetails(sessionId) {
+  const records = await Attendance.find({ sessionId })
+    .populate('studentId', 'fullName rollNumber enrollmentNumber')
     .sort({ rollNumber: 1 })
     .lean();
 
-  const records = await academicDataService.getAllAttendance(filters);
-
-  // Group lectures
-  const lectureMap = {};
-  for (const rec of records) {
-    if (!rec.lectureId) continue;
-    if (!lectureMap[rec.lectureId]) {
-      lectureMap[rec.lectureId] = {
-        lectureId: rec.lectureId,
-        date: rec.date,
-        subjectCode: rec.subjectCode,
-      };
-    }
+  if (records.length === 0) {
+    const err = new Error(`Session ${sessionId} not found`);
+    err.statusCode = 404;
+    throw err;
   }
 
-  const lectures = Object.values(lectureMap).sort((a, b) => (a.date > b.date ? 1 : -1));
-
-  // Build matrix rows
-  const studentRows = students.map((student) => {
-    const studentRecords = records.filter((r) => r.enrollmentNumber === student.enrollmentNumber);
-    const attendanceMap = {};
-    studentRecords.forEach((r) => {
-      attendanceMap[r.lectureId] = r.status;
-    });
-
-    const attendedCount = studentRecords.filter((r) => r.status === 'Present').length;
-    const totalClasses = studentRecords.length;
-    const percentage = totalClasses > 0 ? Math.round((attendedCount / totalClasses) * 10000) / 100 : 100;
-
-    return {
-      enrollmentNumber: student.enrollmentNumber,
-      rollNumber: student.rollNumber,
-      fullName: student.fullName,
-      attendance: attendanceMap,
-      attendedCount,
-      totalClasses,
-      percentage,
-      isDefaulter: totalClasses > 0 ? percentage < 75 : false,
-    };
-  });
-
+  const first = records[0];
   return {
-    lectures,
-    students: studentRows,
-    totalLectures: lectures.length,
-    totalStudents: studentRows.length,
+    sessionId: first.sessionId,
+    attendanceType: first.attendanceType,
+    subjectCode: first.subjectCode,
+    batch: first.batch || '—',
+    date: first.date,
+    slot: first.slot,
+    total: records.length,
+    present: records.filter((r) => r.status === 'PRESENT' || r.status === 'Present').length,
+    absent: records.filter((r) => r.status === 'ABSENT' || r.status === 'Absent').length,
+    records: records.map((r) => ({
+      studentId: r.studentId?._id || r.studentId,
+      rollNumber: r.rollNumber,
+      fullName: r.studentId?.fullName || '',
+      enrollmentNumber: r.enrollmentNumber,
+      status: r.status === 'ABSENT' || r.status === 'Absent' ? 'Absent' : 'Present',
+    })),
   };
 }
 
+/**
+ * Calculates student attendance percentages and defaulters (< 75%)
+ * Treats lecture and practical as separate contexts.
+ * Respects student batch for practicals.
+ */
+async function getDefaulters(filters = {}) {
+  const students = await Student.find({ semester: 5, status: 'active' })
+    .collation({ locale: 'en', numericOrdering: true })
+    .sort({ rollNumber: 1 })
+    .select('_id rollNumber enrollmentNumber fullName batch')
+    .lean();
+
+  const query = {};
+  if (filters.attendanceType) query.attendanceType = normalizeType(filters.attendanceType);
+  if (filters.subjectCode) query.subjectCode = normalizeSubject(filters.subjectCode);
+
+  const allRecords = await Attendance.find(query).lean();
+
+  const result = [];
+  for (const s of students) {
+    const roll = String(s.rollNumber).trim();
+    const batch = getBatchForRoll(roll);
+
+    // Filter sessions applicable to this student
+    const studentRecords = allRecords.filter((rec) => {
+      // Must be this student
+      if (String(rec.studentId) !== String(s._id) && String(rec.rollNumber) !== roll) {
+        return false;
+      }
+      // If practical, must match student's batch
+      if (rec.attendanceType === 'PRACTICAL' && rec.batch && rec.batch !== batch) {
+        return false;
+      }
+      return true;
+    });
+
+    const conducted = studentRecords.length;
+    const attended = studentRecords.filter(
+      (r) => r.status === 'PRESENT' || r.status === 'Present'
+    ).length;
+
+    const percentage = conducted > 0 ? Math.round((attended / conducted) * 10000) / 100 : 100;
+    const isDefaulter = conducted > 0 && percentage < 75; // Exactly 75% is NOT a defaulter
+
+    result.push({
+      studentId: s._id,
+      rollNumber: s.rollNumber,
+      fullName: s.fullName,
+      enrollmentNumber: s.enrollmentNumber,
+      batch,
+      conducted,
+      attended,
+      percentage,
+      isDefaulter,
+    });
+  }
+
+  const defaultersList = result.filter((r) => r.isDefaulter);
+
+  return {
+    totalStudents: result.length,
+    defaultersCount: defaultersList.length,
+    defaulterThreshold: 75,
+    threshold: 75,
+    defaulters: defaultersList,
+    allStudents: result,
+  };
+}
+
+/**
+ * Backward compatibility alias for older controllers
+ */
+async function submitAttendance(params) {
+  return saveAttendanceSession(params);
+}
+
+async function updateAttendance(params) {
+  return saveAttendanceSession(params);
+}
+
 module.exports = {
+  getRoster,
+  saveAttendanceSession,
+  getAttendanceHistory,
+  getSessionDetails,
+  getDefaulters,
   submitAttendance,
   updateAttendance,
-  getLectureAttendance,
-  getStudentAttendance,
-  getClassAttendance,
-  getDefaulters,
-  getAttendanceMatrix,
-  generateLectureId,
-  getStudentsForClass,
-  resolveSubject,
+  normalizeType,
+  normalizeSubject,
+  normalizeBatch,
+  validateDate,
+  generateSessionId,
 };

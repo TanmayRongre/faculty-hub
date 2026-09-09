@@ -1,25 +1,66 @@
 /**
  * attendanceService.js  (frontend)
  *
- * API wrapper for /api/attendance endpoints.
+ * API wrapper for /api/attendance endpoints in Redesigned Architecture:
+ * - Lecture vs Practical
+ * - Batches A, B, C
+ * - History & Defaulters
  */
 
 import api from './api';
 
-/** Faculty: submit attendance for a lecture (Present-by-default). */
-export async function submitAttendance({ date, subjectCode, division = 'A', semester = 5, slot = '1', absentEnrollments }) {
-  const res = await api.post('/attendance/lecture/new', {
-    date,
-    subjectCode,
-    division,
-    semester,
-    slot,
-    absentEnrollments,
-  });
+/**
+ * Fetch roster for attendance marking:
+ * - Lecture: 68 students
+ * - Practical A: 24 students (1–24)
+ * - Practical B: 23 students (25–47)
+ * - Practical C: 21 students (48–68)
+ */
+export async function getRoster({ attendanceType, subjectCode, batch = null }) {
+  const params = { attendanceType, subjectCode };
+  if (batch) params.batch = batch;
+  const res = await api.get('/attendance/roster', { params });
   return res.data;
 }
 
-/** Faculty: update (edit) an existing lecture's attendance. */
+/**
+ * Saves entire attendance session (SAVE ALL).
+ */
+export async function saveAttendanceSession(payload) {
+  const res = await api.post('/attendance/session', payload);
+  return res.data;
+}
+
+/**
+ * Gets attendance session history.
+ */
+export async function getAttendanceHistory(params = {}) {
+  const res = await api.get('/attendance/history', { params });
+  return res.data;
+}
+
+/**
+ * Gets full session records by sessionId.
+ */
+export async function getSessionDetails(sessionId) {
+  const res = await api.get(`/attendance/session/${encodeURIComponent(sessionId)}`);
+  return res.data;
+}
+
+/**
+ * Gets defaulters list (< 75%).
+ */
+export async function getDefaulters(params = {}) {
+  const res = await api.get('/attendance/defaulters', { params });
+  return res.data;
+}
+
+// ─── Backward Compatibility Exports ──────────────────────────────────────────
+
+export async function submitAttendance(payload) {
+  return saveAttendanceSession(payload);
+}
+
 export async function updateLectureAttendance(lectureId, absentEnrollments) {
   const res = await api.put(`/attendance/lecture/${encodeURIComponent(lectureId)}`, {
     absentEnrollments,
@@ -27,53 +68,17 @@ export async function updateLectureAttendance(lectureId, absentEnrollments) {
   return res.data;
 }
 
-/** Faculty: get attendance matrix (students rows × lectures columns). */
-export async function getAttendanceMatrix({ subjectCode, semester = 5 } = {}) {
-  const params = {};
-  if (subjectCode) params.subjectCode = subjectCode;
-  if (semester) params.semester = semester;
-  const res = await api.get('/attendance/matrix', { params });
+export async function getAttendanceMatrix(params = {}) {
+  const res = await api.get('/attendance/history', { params });
   return res.data;
 }
 
-/** Faculty: get existing attendance records for a lecture (for edit mode). */
 export async function getLectureAttendance(lectureId) {
-  const res = await api.get(`/attendance/lecture/${encodeURIComponent(lectureId)}`);
+  const res = await api.get(`/attendance/session/${encodeURIComponent(lectureId)}`);
   return res.data;
 }
 
-/** Faculty: get class-level attendance summary with optional filters. */
-export async function getClassAttendance({ subjectCode, date, lectureId, semester = 5 } = {}) {
-  const params = {};
-  if (subjectCode) params.subjectCode = subjectCode;
-  if (date) params.date = date;
-  if (lectureId) params.lectureId = lectureId;
-  if (semester) params.semester = semester;
-  const res = await api.get('/attendance/class', { params });
-  return res.data;
-}
-
-/** Faculty: get attendance for a specific student by MongoDB ID. */
-export async function getStudentAttendanceById(studentId, { subjectCode } = {}) {
-  const params = {};
-  if (subjectCode) params.subjectCode = subjectCode;
-  const res = await api.get(`/attendance/student/${studentId}`, { params });
-  return res.data;
-}
-
-/** Faculty: get defaulters list. */
-export async function getDefaulters({ subjectCode, semester = 5 } = {}) {
-  const params = {};
-  if (subjectCode) params.subjectCode = subjectCode;
-  if (semester) params.semester = semester;
-  const res = await api.get('/attendance/defaulters', { params });
-  return res.data;
-}
-
-/** Student: get own attendance. */
-export async function getMyAttendance({ subjectCode } = {}) {
-  const params = {};
-  if (subjectCode) params.subjectCode = subjectCode;
-  const res = await api.get('/attendance/me', { params });
+export async function getClassAttendance(params = {}) {
+  const res = await api.get('/attendance/history', { params });
   return res.data;
 }

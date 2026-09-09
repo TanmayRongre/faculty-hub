@@ -1,7 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const {
-  getStudents, getMyProfile, getStudent,
+  getStudents, getStudent,
   createStudent, updateStudent, updateStudentStatus, deleteStudent,
 } = require('../controllers/studentController');
 const { protect, authorize } = require('../middleware/auth');
@@ -30,10 +30,7 @@ const studentUpdateValidation = [
   body('academicYear').optional().matches(/^\d{4}-\d{4}$/),
 ];
 
-// ─── Student self-access ───────────────────────────────────────────────────────
-router.get('/me', protect, authorize('student'), getMyProfile);
-
-// ─── Faculty/Admin management ──────────────────────────────────────────────────
+// ─── Faculty/Admin academic student management ─────────────────────────────────
 router.get('/', protect, authorize('faculty', 'admin'), getStudents);
 router.post('/', protect, authorize('admin'), studentCreateValidation, createStudent);
 

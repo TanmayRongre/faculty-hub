@@ -20,7 +20,10 @@ const sheetsService = require('../../integrations/googleSheets/googleSheetsServi
 const {
   THEORY_SUBJECTS,
   PRACTICAL_SUBJECTS,
+  ALL_ACTIVE_SUBJECTS,
+  SUBJECT_ASSESSMENT_MATRIX,
   isTheorySubject,
+  hasPracticalAssessment,
   validatePAMark,
   calculateTheoryAverage,
   calculateMarks,
@@ -82,6 +85,7 @@ async function getSubjectMarks(subjectCode) {
   const subject = await resolveSubject(code);
 
   const isTheory = isTheorySubject(code);
+  const hasPractical = hasPracticalAssessment(code);
 
   // 1. Fetch all active 5th semester students in numerical roll order
   const students = await Student.find({ semester: 5, status: 'active' })
@@ -91,13 +95,17 @@ async function getSubjectMarks(subjectCode) {
     .lean();
 
   if (!isTheory) {
-    // Return practical subject response
+    // Return non-PA subject response (ENDS has practical, SPI does not)
     return {
       subjectCode: code,
       subjectName: subject.subjectName,
       isTheory: false,
-      practicalAssessment: true,
-      message: `${code} is a practical-oriented course. Theory PA1/PA2 assessments do not apply.`,
+      hasPractical,
+      practicalAssessment: hasPractical,
+      hasPA: false,
+      message: hasPractical
+        ? `${code} is evaluated via Practical Assessment. Theory PA1/PA2 assessments do not apply.`
+        : `${code} is a Seminar/Project Initiation course without PA1/PA2 assessments.`,
       students: students.map((s) => ({
         studentId: s._id,
         rollNo: s.rollNumber,
@@ -109,6 +117,7 @@ async function getSubjectMarks(subjectCode) {
       })),
     };
   }
+
 
   // 2. Fetch existing marks from MongoDB for this subject
   const marksList = await Marks.find({ subjectCode: code }).lean();

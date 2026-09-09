@@ -52,15 +52,13 @@ router.post('/initialise', authorize('admin'), initialiseSpreadsheet);
 router.post('/sync', authorize('admin'), syncStudents);
 router.post('/sync/:studentId', authorize('admin'), syncSingleStudent);
 
-// ─── Marks — /me must be before /:studentId ──────────────────────────────────
-router.get('/marks/me', authorize('student'), getMyMarks);
-router.get('/marks/:studentId', authorize('student', 'faculty', 'admin'), getStudentMarks);
+// ─── Marks ───────────────────────────────────────────────────────────────────
+router.get('/marks/:studentId', authorize('faculty', 'admin'), getStudentMarks);
 router.get('/marks', authorize('faculty', 'admin'), getAllMarks);
 router.post('/marks', authorize('faculty', 'admin'), writeMarks);
 
-// ─── Attendance — /me must be before /:studentId ─────────────────────────────
-router.get('/attendance/me', authorize('student'), getMyAttendance);
-router.get('/attendance/:studentId', authorize('student', 'faculty', 'admin'), getStudentAttendance);
+// ─── Attendance ──────────────────────────────────────────────────────────────
+router.get('/attendance/:studentId', authorize('faculty', 'admin'), getStudentAttendance);
 router.get('/attendance', authorize('faculty', 'admin'), getAllAttendance);
 router.post('/attendance', authorize('faculty', 'admin'), writeAttendance);
 

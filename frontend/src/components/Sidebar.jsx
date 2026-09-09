@@ -13,7 +13,7 @@ import {
   CalendarCheck2,
   CalendarDays,
   Megaphone,
-  Images,
+  CheckSquare,
   LogOut,
   X,
 } from 'lucide-react';
@@ -22,13 +22,13 @@ const NAV_ICONS = {
   '/faculty/dashboard': LayoutDashboard,
   '/faculty/students': Users,
   '/faculty/faculty': GraduationCap,
+  '/faculty/tasks': CheckSquare,
   '/faculty/academic': Library,
   '/faculty/subjects': BookOpen,
   '/faculty/marks': BarChart3,
   '/faculty/attendance': CalendarCheck2,
   '/faculty/timetable': CalendarDays,
   '/faculty/notices': Megaphone,
-  '/faculty/gallery': Images,
 };
 
 const NavLink = ({ to, label, active, onClick }) => {
@@ -66,14 +66,14 @@ const Sidebar = ({ activePath, isOpen, onClose }) => {
   const navItems = [
     { to: '/faculty/dashboard', label: 'Dashboard' },
     { to: '/faculty/students', label: 'Students' },
-    { to: '/faculty/faculty', label: 'Faculty' },
+    { to: '/faculty/faculty', label: user?.role === 'admin' ? 'Faculty Management' : 'Faculty Directory' },
+    { to: '/faculty/tasks', label: user?.role === 'admin' ? 'Task Management' : 'My Tasks' },
     { to: '/faculty/academic', label: 'Academic Structure' },
     { to: '/faculty/subjects', label: 'Subjects' },
     { to: '/faculty/marks', label: 'Marks Management' },
     { to: '/faculty/attendance', label: 'Fast Attendance' },
     { to: '/faculty/timetable', label: 'Smart Scheduler' },
     { to: '/faculty/notices', label: 'Notice Board' },
-    { to: '/faculty/gallery', label: 'Activity Gallery' },
   ];
 
   return (

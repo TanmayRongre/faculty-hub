@@ -3,12 +3,18 @@
  *
  * Assessment calculation and evaluation engine for 5th Semester Computer Engineering.
  *
- * Theory Subjects (PA1 + PA2):
+ * PA Theory Subjects (PA1 + PA2):
  *   - STE: Software Engineering
  *   - OSY: Operating System
  *   - ACN: Advance Computer Network
  *
- * Practical-oriented subjects (SPI, ITR, ENDS) remain separate without theory PA1/PA2 assessments.
+ * Practical Assessment Subjects:
+ *   - STE, OSY, ACN, ENDS (Practical = YES)
+ *   - SPI (Practical = NO)
+ *
+ * PA Assessments:
+ *   - STE, OSY, ACN: PA1 (out of 30), PA2 (out of 30), Average = (PA1 + PA2) / 2
+ *   - ENDS, SPI: PA1 = NO, PA2 = NO, Average = NO (No PA fields)
  *
  * Rules:
  *   - PA1, PA2 allowed range: 0 to 30.
@@ -19,7 +25,16 @@
  */
 
 const THEORY_SUBJECTS = ['STE', 'OSY', 'ACN'];
-const PRACTICAL_SUBJECTS = ['SPI', 'ITR', 'ENDS'];
+const PRACTICAL_SUBJECTS = ['STE', 'OSY', 'ACN', 'ENDS'];
+const ALL_ACTIVE_SUBJECTS = ['STE', 'ACN', 'OSY', 'SPI', 'ENDS'];
+
+const SUBJECT_ASSESSMENT_MATRIX = {
+  STE:  { practical: true,  pa1: true,  pa2: true,  average: true },
+  OSY:  { practical: true,  pa1: true,  pa2: true,  average: true },
+  ACN:  { practical: true,  pa1: true,  pa2: true,  average: true },
+  ENDS: { practical: true,  pa1: false, pa2: false, average: false },
+  SPI:  { practical: false, pa1: false, pa2: false, average: false },
+};
 
 const MSBTE_CONFIG = {
   MAX_PA: 30,
@@ -33,7 +48,7 @@ const MSBTE_CONFIG = {
 };
 
 /**
- * Checks if a subject is a theory subject with PA1 + PA2.
+ * Checks if a subject has PA1 + PA2 assessments (STE, OSY, ACN).
  * @param {string} subjectCode
  * @returns {boolean}
  */
@@ -41,6 +56,17 @@ function isTheorySubject(subjectCode) {
   if (!subjectCode) return false;
   return THEORY_SUBJECTS.includes(subjectCode.toUpperCase().trim());
 }
+
+/**
+ * Checks if a subject has practical assessment (STE, OSY, ACN, ENDS).
+ * @param {string} subjectCode
+ * @returns {boolean}
+ */
+function hasPracticalAssessment(subjectCode) {
+  if (!subjectCode) return false;
+  return PRACTICAL_SUBJECTS.includes(subjectCode.toUpperCase().trim());
+}
+
 
 /**
  * Validates a single PA mark value (PA1 or PA2).
@@ -141,10 +167,14 @@ function calculateMarks(record) {
 module.exports = {
   THEORY_SUBJECTS,
   PRACTICAL_SUBJECTS,
+  ALL_ACTIVE_SUBJECTS,
+  SUBJECT_ASSESSMENT_MATRIX,
   MSBTE_CONFIG,
   isTheorySubject,
+  hasPracticalAssessment,
   validatePAMark,
   calculateTheoryAverage,
   getPerformanceStatus,
   calculateMarks,
 };
+

@@ -14,10 +14,12 @@ export const facultyService = {
   getFaculty: (params) => api.get('/faculty', { params }).then(r => r.data),
   getFacultyList: (params) => api.get('/faculty', { params }).then(r => r.data),
   getMyFacultyProfile: () => api.get('/faculty/me').then(r => r.data),
+  getMyAssignedSubjects: () => api.get('/faculty/me/assigned-subjects').then(r => r.data),
   getFacultyById: (id) => api.get(`/faculty/${id}`).then(r => r.data),
   createFaculty: (data) => api.post('/faculty', data).then(r => r.data),
   updateFaculty: (id, data) => api.put(`/faculty/${id}`, data).then(r => r.data),
   updateFacultyStatus: (id, status) => api.patch(`/faculty/${id}/status`, { status }).then(r => r.data),
+  assignSubjects: (id, subjectIds) => api.post(`/faculty/${id}/subjects`, { subjectIds }).then(r => r.data),
 };
 
 export const academicService = {

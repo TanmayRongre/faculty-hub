@@ -29,15 +29,25 @@ export const ACADEMIC_CONFIG = {
     'NCC Administrator',
   ],
 
-  // Active Subjects for 5th Semester Computer Engineering (Exactly 6 — official MSBTE scheme)
+  // Active Subjects for 5th Semester Computer Engineering (Exactly 5 — official MSBTE scheme)
   SUBJECTS: [
     { code: 'STE',  name: 'Software Engineering',                     courseCode: '315323' },
     { code: 'ACN',  name: 'Advance Computer Network',                 courseCode: '315321' },
     { code: 'OSY',  name: 'Operating System',                         courseCode: '315319' },
     { code: 'SPI',  name: 'Seminar and Project Initiation Course',    courseCode: '315003' },
-    { code: 'ITR',  name: 'Internship (12 Weeks)',                    courseCode: '315004' },
     { code: 'ENDS', name: 'Entrepreneurship Development and Startups',courseCode: '315002' },
   ],
+
+  // Assessment Structure Matrix
+  PRACTICAL_SUBJECTS: ['STE', 'OSY', 'ACN', 'ENDS'],
+  THEORY_PA_SUBJECTS: ['STE', 'OSY', 'ACN'],
+  ASSESSMENT_MATRIX: {
+    STE:  { practical: true,  pa1: true,  pa2: true,  average: true },
+    OSY:  { practical: true,  pa1: true,  pa2: true,  average: true },
+    ACN:  { practical: true,  pa1: true,  pa2: true,  average: true },
+    ENDS: { practical: true,  pa1: false, pa2: false, average: false },
+    SPI:  { practical: false, pa1: false, pa2: false, average: false },
+  },
 
   // Marks Configuration (PA only, 0–30)
   MARKS: {

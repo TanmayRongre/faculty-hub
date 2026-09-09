@@ -1,7 +1,14 @@
 const express = require('express');
 const { body } = require('express-validator');
 const {
-  getFacultyList, getMyFacultyProfile, getFaculty, createFaculty, updateFaculty, updateFacultyStatus,
+  getFacultyList,
+  getMyFacultyProfile,
+  getFaculty,
+  createFaculty,
+  updateFaculty,
+  updateFacultyStatus,
+  assignSubjects,
+  getMyAssignedSubjects,
 } = require('../controllers/facultyController');
 const { protect, authorize } = require('../middleware/auth');
 const { FACULTY_DESIGNATIONS } = require('../config/academic');
@@ -30,14 +37,16 @@ const facultyUpdateValidation = [
     .withMessage(`Designation must be one of: ${FACULTY_DESIGNATIONS.join(', ')}`),
 ];
 
-// Authenticated faculty/admin can access own profile
+// Authenticated faculty/admin can access own profile & assigned subjects
 router.get('/me', protect, authorize('faculty', 'admin'), getMyFacultyProfile);
+router.get('/me/assigned-subjects', protect, authorize('faculty', 'admin'), getMyAssignedSubjects);
 
-// Faculty management (faculty/admin can read, only admin can create/update/status)
+// Faculty management (faculty/admin can read, only admin can create/update/status/assign-subjects)
 router.get('/', protect, authorize('faculty', 'admin'), getFacultyList);
 router.get('/:id', protect, authorize('faculty', 'admin'), getFaculty);
 router.post('/', protect, authorize('admin'), facultyCreateValidation, createFaculty);
 router.put('/:id', protect, authorize('admin'), facultyUpdateValidation, updateFaculty);
 router.patch('/:id/status', protect, authorize('admin'), updateFacultyStatus);
+router.post('/:id/subjects', protect, authorize('admin'), assignSubjects);
 
 module.exports = router;

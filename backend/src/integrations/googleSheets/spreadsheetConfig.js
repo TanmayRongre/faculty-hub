@@ -111,9 +111,37 @@ const SUBJECT_CATEGORIES = {
   MARKS: 'MARK',
 };
 
-const VALID_SUBJECTS = ['STE', 'ACN', 'OSY', 'SPI', 'ITR', 'ENDS'];
+const VALID_SUBJECTS = ['STE', 'ACN', 'OSY', 'SPI', 'ENDS'];
 // Backward-compatible alias
 const SUBJECT_SHEETS = VALID_SUBJECTS;
+
+/**
+ * Attendance Redesign: Subjects strictly STE, OSY, ENDS, ACN
+ */
+const ATTENDANCE_SUBJECTS = ['STE', 'OSY', 'ENDS', 'ACN'];
+const PRACTICAL_BATCHES = ['A', 'B', 'C'];
+
+const BATCH_DEFINITIONS = {
+  A: { minRoll: 1, maxRoll: 24, count: 24 },
+  B: { minRoll: 25, maxRoll: 47, count: 23 },
+  C: { minRoll: 48, maxRoll: 68, count: 21 },
+};
+
+function getBatchForRoll(rollNumber) {
+  const r = Number(rollNumber);
+  if (r >= 1 && r <= 24) return 'A';
+  if (r >= 25 && r <= 47) return 'B';
+  if (r >= 48 && r <= 68) return 'C';
+  return null;
+}
+
+function validateBatchRoll(batch, rollNumber) {
+  const b = String(batch || '').trim().toUpperCase();
+  const def = BATCH_DEFINITIONS[b];
+  if (!def) return false;
+  const r = Number(rollNumber);
+  return r >= def.minRoll && r <= def.maxRoll;
+}
 
 /**
  * Normalizes subject code (uppercase, trimmed)
@@ -123,15 +151,54 @@ function normalizeSubjectCode(code) {
 }
 
 /**
- * Validates if subject is one of the strictly 6 allowed subjects
+ * Validates if subject is one of the allowed subjects
  */
 function isValidSubject(code) {
   return VALID_SUBJECTS.includes(normalizeSubjectCode(code));
 }
 
+function isValidAttendanceSubject(code) {
+  return ATTENDANCE_SUBJECTS.includes(normalizeSubjectCode(code));
+}
+
+/**
+ * Maps Attendance Type + Subject + Batch to Google Sheets Worksheet Name:
+ * - Lecture: ATT-LEC-<SUB> (e.g. ATT-LEC-STE)
+ * - Practical: ATT-PR-<SUB>-<BATCH> (e.g. ATT-PR-STE-A)
+ */
+function getAttendanceWorksheetName(attendanceType, subjectCode, batch = null) {
+  const normType = String(attendanceType || '').trim().toUpperCase();
+  const sub = normalizeSubjectCode(subjectCode);
+
+  if (!isValidAttendanceSubject(sub)) {
+    throw new Error(
+      `Invalid attendance subject: "${subjectCode}". Allowed attendance subjects: ${ATTENDANCE_SUBJECTS.join(', ')}`
+    );
+  }
+
+  if (normType === 'LECTURE' || normType === 'LEC') {
+    if (batch) {
+      throw new Error(`Batch selection is not allowed for Lecture attendance (${sub})`);
+    }
+    return `ATT-LEC-${sub}`;
+  }
+
+  if (normType === 'PRACTICAL' || normType === 'PR') {
+    const b = String(batch || '').trim().toUpperCase();
+    if (!PRACTICAL_BATCHES.includes(b)) {
+      throw new Error(
+        `Invalid practical batch: "${batch}". Must be one of: ${PRACTICAL_BATCHES.join(', ')}`
+      );
+    }
+    return `ATT-PR-${sub}-${b}`;
+  }
+
+  throw new Error(`Invalid attendance type: "${attendanceType}". Must be LECTURE or PRACTICAL.`);
+}
+
 /**
  * Centralized mapping: CATEGORY + SUBJECT -> GOOGLE WORKSHEET NAME
- * Example: getSubjectWorksheetName('ATTENDANCE', 'STE') -> 'ATT_STE'
+ * Example: getSubjectWorksheetName('ATTENDANCE', 'STE') -> 'ATT_STE' (Legacy)
  * Example: getSubjectWorksheetName('MARK', 'ACN') -> 'MARK_ACN'
  */
 function getSubjectWorksheetName(category, subjectCode) {
@@ -156,22 +223,37 @@ function getSubjectWorksheetName(category, subjectCode) {
 }
 
 /**
- * Pre-defined list of all 12 category-subject worksheets
+ * 16 Attendance Worksheets (4 Lecture + 12 Practical)
  */
-const ATTENDANCE_WORKSHEETS = VALID_SUBJECTS.map((sub) => `ATT_${sub}`);
+const ATTENDANCE_LECTURE_WORKSHEETS = ATTENDANCE_SUBJECTS.map((sub) => `ATT-LEC-${sub}`);
+const ATTENDANCE_PRACTICAL_WORKSHEETS = ATTENDANCE_SUBJECTS.flatMap((sub) =>
+  PRACTICAL_BATCHES.map((b) => `ATT-PR-${sub}-${b}`)
+);
+const ALL_ATTENDANCE_WORKSHEETS = [
+  ...ATTENDANCE_LECTURE_WORKSHEETS,
+  ...ATTENDANCE_PRACTICAL_WORKSHEETS,
+];
+
+// Legacy attendance worksheets
+const LEGACY_ATTENDANCE_WORKSHEETS = ['ATT_STE', 'ATT_ACN', 'ATT_OSY', 'ATT_SPI', 'ATT_ENDS', 'Attendance_Legacy'];
+
+// Marks worksheets
 const MARKS_WORKSHEETS = VALID_SUBJECTS.map((sub) => `MARK_${sub}`);
-const ALL_CATEGORY_WORKSHEETS = [...ATTENDANCE_WORKSHEETS, ...MARKS_WORKSHEETS];
+const ALL_CATEGORY_WORKSHEETS = [...ALL_ATTENDANCE_WORKSHEETS, ...MARKS_WORKSHEETS];
 
 /**
  * Column definitions for subject-wise worksheets:
  * Attendance: Col A (0): Roll No., Col B (1): Name, Col C+ (2+): Lecture dates (DD-MMM-YYYY)
- * Marks: Col A (0): Roll No., Col B (1): Name, Col C (2): PA
+ * Marks: Col A (0): Roll No., Col B (1): Name, Col C (2): PA1, Col D (3): PA2, Col E (4): Avg
  */
 const SUBJECT_ATTENDANCE_HEADERS = ['Roll No.', 'Name'];
-const SUBJECT_MARKS_HEADERS = ['Roll No.', 'Name', 'PA1', 'PA2', 'Average'];
+const SUBJECT_MARKS_HEADERS = ['Roll No.', 'Name', 'PA1', 'PA2', 'Avg'];
 
-// Register headers for all category-subject worksheets in HEADERS map
-for (const sheet of ATTENDANCE_WORKSHEETS) {
+// Register headers for all 16 attendance worksheets and mark worksheets
+for (const sheet of ALL_ATTENDANCE_WORKSHEETS) {
+  HEADERS[sheet] = SUBJECT_ATTENDANCE_HEADERS;
+}
+for (const sheet of LEGACY_ATTENDANCE_WORKSHEETS) {
   HEADERS[sheet] = SUBJECT_ATTENDANCE_HEADERS;
 }
 for (const sheet of MARKS_WORKSHEETS) {
@@ -233,7 +315,18 @@ module.exports = {
   SUBJECT_CATEGORIES,
   VALID_SUBJECTS,
   SUBJECT_SHEETS,
-  ATTENDANCE_WORKSHEETS,
+  ATTENDANCE_SUBJECTS,
+  PRACTICAL_BATCHES,
+  BATCH_DEFINITIONS,
+  getBatchForRoll,
+  validateBatchRoll,
+  isValidAttendanceSubject,
+  getAttendanceWorksheetName,
+  ATTENDANCE_LECTURE_WORKSHEETS,
+  ATTENDANCE_PRACTICAL_WORKSHEETS,
+  ALL_ATTENDANCE_WORKSHEETS,
+  LEGACY_ATTENDANCE_WORKSHEETS,
+  ATTENDANCE_WORKSHEETS: ALL_ATTENDANCE_WORKSHEETS, // Backward compatible
   MARKS_WORKSHEETS,
   ALL_CATEGORY_WORKSHEETS,
   SUBJECT_ATTENDANCE_HEADERS,

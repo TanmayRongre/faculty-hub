@@ -37,8 +37,12 @@ export const AuthProvider = ({ children }) => {
       try {
         const data = await authService.getMe();
         if (data.success) {
-          setUser(data.user);
-          setToken(storedToken);
+          if (data.user?.role === 'student') {
+            clearSession();
+          } else {
+            setUser(data.user);
+            setToken(storedToken);
+          }
         } else {
           clearSession();
         }
@@ -53,15 +57,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = useCallback(async (credentials) => {
     const data = await authService.login(credentials);
-    if (data.success) {
-      saveSession(data.token, data.user);
-    }
-    return data;
-  }, []);
-
-  const register = useCallback(async (userData) => {
-    const data = await authService.register(userData);
-    if (data.success) {
+    if (data.success && ['faculty', 'admin'].includes(data.user?.role)) {
       saveSession(data.token, data.user);
     }
     return data;
@@ -71,10 +67,9 @@ export const AuthProvider = ({ children }) => {
     clearSession();
   }, []);
 
-  const isAuthenticated = !!user && !!token;
+  const isAuthenticated = !!user && !!token && ['faculty', 'admin'].includes(user?.role);
   const isFaculty = user?.role === 'faculty';
   const isAdmin = user?.role === 'admin';
-  const isStudent = user?.role === 'student';
   const isFacultyOrAdmin = isFaculty || isAdmin;
 
   const value = {
@@ -84,10 +79,8 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated,
     isFaculty,
     isAdmin,
-    isStudent,
     isFacultyOrAdmin,
     login,
-    register,
     logout,
   };
 

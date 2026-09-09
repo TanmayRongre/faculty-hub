@@ -63,10 +63,15 @@ const StudentDetailPage = () => {
               onClick={() => navigate('/faculty/students')}
               className="text-slate-400 hover:text-white transition-colors text-sm"
             >
-              ← Students
+              ← Student Roster
             </button>
             <span className="text-slate-700">/</span>
-            <h1 className="text-xl font-bold text-white">{student.fullName}</h1>
+            <div>
+              <span className="text-[10px] uppercase font-bold text-blue-400 tracking-wider block">
+                Academic Student Record
+              </span>
+              <h1 className="text-xl font-bold text-white">{student.fullName}</h1>
+            </div>
             <StatusBadge status={student.status} />
           </div>
           {isAdmin && (

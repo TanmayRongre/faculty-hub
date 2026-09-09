@@ -83,7 +83,7 @@ async function initialiseSpreadsheet() {
     log.push({ sheet: SHEET_NAMES.STUDENTS, status: 'error', error: err.message });
   }
 
-  // 2. Attendance worksheets: ATT_STE, ATT_ACN, ATT_OSY, ATT_SPI, ATT_ITR, ATT_ENDS
+  // 2. Attendance worksheets: ATT_STE, ATT_ACN, ATT_OSY, ATT_SPI, ATT_ENDS
   for (const sub of VALID_SUBJECTS) {
     try {
       const name = await sheets.ensureAttendanceWorksheet(sub);
@@ -93,7 +93,7 @@ async function initialiseSpreadsheet() {
     }
   }
 
-  // 3. Marks worksheets: MARK_STE, MARK_ACN, MARK_OSY, MARK_SPI, MARK_ITR, MARK_ENDS
+  // 3. Marks worksheets: MARK_STE, MARK_ACN, MARK_OSY, MARK_SPI, MARK_ENDS
   for (const sub of VALID_SUBJECTS) {
     try {
       const name = await sheets.ensureMarksWorksheet(sub);

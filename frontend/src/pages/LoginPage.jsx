@@ -18,9 +18,8 @@ const LoginPage = () => {
   const from = location.state?.from?.pathname || null;
 
   const demoAccounts = [
-    { label: 'Admin', email: 'admin@facultyhub.dev', password: 'Admin@1234', icon: Shield, color: 'text-purple-400 bg-purple-950/40 border-purple-800/50 hover:bg-purple-900/40' },
+    { label: 'Admin', email: 'facultyhub0024@gmail.com', password: 'asdf123', icon: Shield, color: 'text-purple-400 bg-purple-950/40 border-purple-800/50 hover:bg-purple-900/40' },
     { label: 'Faculty', email: 'faculty@facultyhub.dev', password: 'Faculty@1234', icon: UserCheck, color: 'text-blue-400 bg-blue-950/40 border-blue-800/50 hover:bg-blue-900/40' },
-    { label: 'Student', email: 'student@facultyhub.dev', password: 'Student@1234', icon: GraduationCap, color: 'text-emerald-400 bg-emerald-950/40 border-emerald-800/50 hover:bg-emerald-900/40' },
   ];
 
   const fillDemo = (email, password) => {
@@ -55,11 +54,8 @@ const LoginPage = () => {
       const data = await login({ email: form.email, password: form.password });
       if (data.success) {
         toast.success(`Welcome back, ${data.user.name}!`);
-        const role = data.user.role;
-        if (from && !from.includes('/login')) {
+        if (from && !from.includes('/login') && !from.includes('/student')) {
           navigate(from, { replace: true });
-        } else if (role === 'student') {
-          navigate('/student/dashboard', { replace: true });
         } else {
           navigate('/faculty/dashboard', { replace: true });
         }
@@ -95,24 +91,24 @@ const LoginPage = () => {
             FacultyHub
           </div>
           <h1 className="text-xl font-bold text-white tracking-tight">
-            {INSTITUTION.NAME}
+            {INSTITUTION.name || INSTITUTION.NAME}
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Academic Management & Portal System
+          <p className="text-xs text-slate-400 mt-1 font-medium">
+            Faculty & Administration Portal
           </p>
         </div>
 
         {/* Card */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
-          <h2 className="text-lg font-semibold text-white mb-1">Sign in</h2>
-          <p className="text-xs text-slate-400 mb-6">Enter your registered email and password to access your account.</p>
+          <h2 className="text-lg font-semibold text-white mb-1">Faculty & Admin Sign in</h2>
+          <p className="text-xs text-slate-400 mb-6">Enter your registered academic credentials to access your workspace.</p>
 
           {/* Quick Demo Access Pills */}
           <div className="mb-6 pb-5 border-b border-slate-800">
             <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-2.5">
               Quick Demo Login:
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2.5">
               {demoAccounts.map((acc) => {
                 const IconComponent = acc.icon;
                 return (

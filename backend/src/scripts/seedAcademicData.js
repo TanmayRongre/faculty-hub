@@ -142,7 +142,6 @@ async function seedAcademicData() {
     ACN: seededFaculty[1]._id, // Permanent Faculty
     OSY: seededFaculty[2]._id, // Normal Faculty
     SPI: seededFaculty[1]._id, // Permanent Faculty
-    ITR: seededFaculty[3]._id, // NCC Administrator
     ENDS: seededFaculty[0]._id, // HOD
   };
 
@@ -177,13 +176,13 @@ async function seedAcademicData() {
     { day: 'Monday', time: '10:15', end: '11:15', code: 'ACN', room: 'Lab 1', fac: seededFaculty[1]._id },
     { day: 'Tuesday', time: '09:00', end: '10:00', code: 'OSY', room: 'Room 201', fac: seededFaculty[2]._id },
     { day: 'Tuesday', time: '10:15', end: '11:15', code: 'SPI', room: 'Room 202', fac: seededFaculty[1]._id },
-    { day: 'Wednesday', time: '09:00', end: '10:00', code: 'ITR', room: 'Room 201', fac: seededFaculty[3]._id },
+    { day: 'Wednesday', time: '09:00', end: '10:00', code: 'STE', room: 'Room 201', fac: seededFaculty[0]._id },
     { day: 'Wednesday', time: '10:15', end: '11:15', code: 'ENDS', room: 'Seminar Hall', fac: seededFaculty[0]._id },
     { day: 'Thursday', time: '09:00', end: '10:00', code: 'STE', room: 'Lab 2', fac: seededFaculty[0]._id },
     { day: 'Thursday', time: '10:15', end: '11:15', code: 'ACN', room: 'Room 201', fac: seededFaculty[1]._id },
     { day: 'Friday', time: '09:00', end: '10:00', code: 'OSY', room: 'Lab 3', fac: seededFaculty[2]._id },
     { day: 'Friday', time: '10:15', end: '11:15', code: 'SPI', room: 'Room 201', fac: seededFaculty[1]._id },
-    { day: 'Saturday', time: '09:00', end: '10:00', code: 'ITR', room: 'Room 201', fac: seededFaculty[3]._id },
+    { day: 'Saturday', time: '09:00', end: '10:00', code: 'OSY', room: 'Room 201', fac: seededFaculty[2]._id },
     { day: 'Saturday', time: '10:15', end: '11:15', code: 'ENDS', room: 'Room 202', fac: seededFaculty[0]._id },
   ];
 

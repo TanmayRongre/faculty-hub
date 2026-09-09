@@ -41,7 +41,6 @@ const TimetableSlot = require('../models/TimetableSlot');
 const Lecture = require('../models/Lecture');
 const Holiday = require('../models/Holiday');
 const Notice = require('../models/Notice');
-const Gallery = require('../models/Gallery');
 
 // Soft imports — models that may not exist in all versions
 let Course, Semester, Division;
@@ -135,7 +134,6 @@ const SUBJECTS_DATA = [
   { code: 'ACN',  name: 'Advance Computer Network',                 courseCode: '315321' },
   { code: 'OSY',  name: 'Operating System',                         courseCode: '315319' },
   { code: 'SPI',  name: 'Seminar and Project Initiation Course',    courseCode: '315003' },
-  { code: 'ITR',  name: 'Internship (12 Weeks)',                    courseCode: '315004' },
   { code: 'ENDS', name: 'Entrepreneurship Development and Startups',courseCode: '315002' },
 ];
 
@@ -256,9 +254,7 @@ async function resetAndSeed() {
   const noticesDeleted = await Notice.deleteMany({});
   console.log(`  ✓ Notices deleted:        ${noticesDeleted.deletedCount}`);
 
-  // Gallery
-  const galleryDeleted = await Gallery.deleteMany({});
-  console.log(`  ✓ Gallery deleted:        ${galleryDeleted.deletedCount}`);
+
 
   // Students
   const studentsDeleted = await Student.deleteMany({});
@@ -493,7 +489,6 @@ async function resetAndSeed() {
   const finalSlots = await TimetableSlot.countDocuments();
   const finalLectures = await Lecture.countDocuments();
   const finalNotices = await Notice.countDocuments();
-  const finalGallery = await Gallery.countDocuments();
   const finalFaculty = await Faculty.countDocuments();
 
   const ce = await Department.findOne({ code: 'CE' });
@@ -517,7 +512,6 @@ async function resetAndSeed() {
   console.log(`  Lectures conducted:      ${finalLectures} ${finalLectures === 0 ? '✅' : '❌ (expected 0)'}`);
   console.log(`  Faculty profiles:        ${finalFaculty} ${finalFaculty === 0 ? '✅ (none — to be added later)' : '⚠️ (unexpected)'}`);
   console.log(`  Notices:                 ${finalNotices} ${finalNotices === 0 ? '✅' : '❌ (expected 0)'}`);
-  console.log(`  Gallery entries:         ${finalGallery} ${finalGallery === 0 ? '✅' : '❌ (expected 0)'}`);
 
   console.log('\n  Subjects created:');
   for (const s of subjectList.sort((a,b) => a.subjectCode.localeCompare(b.subjectCode))) {

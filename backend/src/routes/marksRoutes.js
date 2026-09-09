@@ -17,6 +17,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
+const { authorizeSubjectAccess } = require('../middleware/subjectAccess');
 const {
   getMyMarks,
   getStudentMarks,
@@ -27,24 +28,21 @@ const {
   resetMarks,
 } = require('../controllers/marksController');
 
-// Student: own marks
-router.get('/me', protect, authorize('student'), getMyMarks);
-
-// Faculty/admin: subject-wise student marks (68 students)
-router.get('/subject/:subjectCode', protect, authorize('faculty', 'admin'), getSubjectMarks);
+// Faculty/admin: subject-wise student marks (68 students) — strictly authorized by assigned subject
+router.get('/subject/:subjectCode', protect, authorize('faculty', 'admin'), authorizeSubjectAccess('subjectCode'), getSubjectMarks);
 
 // Faculty/admin: specific student marks
 router.get('/student/:studentId', protect, authorize('faculty', 'admin'), getStudentMarks);
 
-// Faculty/admin: bulk update marks (SAVE ALL)
-router.put('/batch', protect, authorize('faculty', 'admin'), bulkUpdateMarks);
-router.put('/bulk', protect, authorize('faculty', 'admin'), bulkUpdateMarks);
+// Faculty/admin: bulk update marks (SAVE ALL) — strictly authorized by assigned subject in body
+router.put('/batch', protect, authorize('faculty', 'admin'), authorizeSubjectAccess('subject'), bulkUpdateMarks);
+router.put('/bulk', protect, authorize('faculty', 'admin'), authorizeSubjectAccess('subject'), bulkUpdateMarks);
 
 // Faculty/admin: all marks (with filters)
-router.get('/', protect, authorize('faculty', 'admin'), getAllMarks);
+router.get('/', protect, authorize('faculty', 'admin'), authorizeSubjectAccess('subjectCode'), getAllMarks);
 
-// Faculty/admin: update single student mark
-router.put('/:studentId/:subjectCode', protect, authorize('faculty', 'admin'), updateMarks);
+// Faculty/admin: update single student mark — strictly authorized by assigned subject
+router.put('/:studentId/:subjectCode', protect, authorize('faculty', 'admin'), authorizeSubjectAccess('subjectCode'), updateMarks);
 
 // Admin: reset marks data
 router.post('/reset', protect, authorize('admin'), resetMarks);

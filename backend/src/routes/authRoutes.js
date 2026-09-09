@@ -21,7 +21,7 @@ const loginValidation = [
   body('password').notEmpty().withMessage('Password is required'),
 ];
 
-// Admin user creation — role accepted, full validation
+// Admin user creation — role accepted, full validation (faculty or admin only)
 const adminCreateUserValidation = [
   body('name').trim().notEmpty().withMessage('Name is required').isLength({ max: 100 }),
   body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
@@ -29,14 +29,14 @@ const adminCreateUserValidation = [
     .isLength({ min: 6 })
     .withMessage('Password must be at least 6 characters'),
   body('role')
-    .isIn(['faculty', 'admin', 'student'])
-    .withMessage('Role must be faculty, admin, or student'),
+    .isIn(['faculty', 'admin'])
+    .withMessage('Role must be faculty or admin'),
 ];
 
 // ─── Public routes ────────────────────────────────────────────────────────────
 
-// Student self-registration (role always forced to 'student')
-router.post('/register', registerValidation, register);
+// Public registration is disabled (returns 403)
+router.post('/register', register);
 
 // Login
 router.post('/login', loginValidation, login);

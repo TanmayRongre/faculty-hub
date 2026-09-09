@@ -303,6 +303,17 @@ const {
   SUBJECT_CATEGORIES,
   VALID_SUBJECTS,
   SUBJECT_SHEETS,
+  ATTENDANCE_SUBJECTS,
+  PRACTICAL_BATCHES,
+  BATCH_DEFINITIONS,
+  getBatchForRoll,
+  validateBatchRoll,
+  isValidAttendanceSubject,
+  getAttendanceWorksheetName,
+  ATTENDANCE_LECTURE_WORKSHEETS,
+  ATTENDANCE_PRACTICAL_WORKSHEETS,
+  ALL_ATTENDANCE_WORKSHEETS,
+  LEGACY_ATTENDANCE_WORKSHEETS,
   SUBJECT_ATTENDANCE_HEADERS,
   SUBJECT_MARKS_HEADERS,
   formatAttendanceDate,
@@ -472,15 +483,14 @@ async function syncSubjectStudentRoster(subjectCode, students = []) {
 }
 
 /**
- * Finds or creates a lecture date column in row 1 of ATT_<SUBJECT>.
- * Stores the lectureId in cell note for reliable session mapping.
+ * Generic: Finds or creates a date column in row 1 of any attendance worksheet.
+ * Stores the sessionId in the cell note for reliable session mapping.
  *
- * @param {string} subjectCode
- * @param {string} lectureId
+ * @param {string} sheetName
+ * @param {string} sessionId
  * @param {string} dateStr
  */
-async function ensureAttendanceDateColumn(subjectCode, lectureId, dateStr) {
-  const sheetName = getSubjectWorksheetName('ATT', subjectCode);
+async function ensureDateColumnForWorksheet(sheetName, sessionId, dateStr) {
   const formattedDate = formatAttendanceDate(dateStr);
 
   const row1 = await readRange(`${sheetName}!1:1`);
@@ -488,7 +498,7 @@ async function ensureAttendanceDateColumn(subjectCode, lectureId, dateStr) {
 
   let matchedColIndex = -1;
 
-  // Check cell notes for exact lectureId match
+  // Check cell notes for exact sessionId match
   try {
     const sheets = getSheetsClient();
     const metaRes = await sheets.spreadsheets.get({
@@ -505,7 +515,7 @@ async function ensureAttendanceDateColumn(subjectCode, lectureId, dateStr) {
       const cellNote = cell?.note?.trim();
       const cellText = cell?.formattedValue?.trim();
 
-      if (lectureId && cellNote && cellNote.toLowerCase() === lectureId.trim().toLowerCase()) {
+      if (sessionId && cellNote && cellNote.toLowerCase() === sessionId.trim().toLowerCase()) {
         matchedColIndex = c;
         break;
       }
@@ -575,7 +585,7 @@ async function ensureAttendanceDateColumn(subjectCode, lectureId, dateStr) {
                     backgroundColor: { red: 0.93, green: 0.95, blue: 0.98 },
                     horizontalAlignment: 'CENTER',
                   },
-                  note: lectureId || '',
+                  note: sessionId || '',
                 },
                 fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment),note',
               },
@@ -597,20 +607,19 @@ async function ensureAttendanceDateColumn(subjectCode, lectureId, dateStr) {
 }
 
 /**
- * Updates attendance for a single lecture session in ATT_<SUBJECT> in one batch operation.
+ * Generic: Updates attendance for a single session in a specified worksheet in one batch operation.
+ * Guaranteed zero cross-contamination.
  *
- * @param {string} subjectCode
- * @param {string} lectureId
+ * @param {string} sheetName
+ * @param {string} sessionId
  * @param {string} dateStr
- * @param {Array<{ rollNumber: string, status: string }>} studentAttendanceList
+ * @param {Array<{ rollNumber: string|number, status: string }>} studentAttendanceList
  */
-async function updateSubjectAttendance(subjectCode, lectureId, dateStr, studentAttendanceList) {
-  const sheetName = getSubjectWorksheetName('ATT', subjectCode);
+async function updateWorksheetAttendance(sheetName, sessionId, dateStr, studentAttendanceList) {
+  // 1. Ensure date column exists in the target worksheet
+  const { colLetter } = await ensureDateColumnForWorksheet(sheetName, sessionId, dateStr);
 
-  // 1. Ensure date column exists
-  const { colLetter } = await ensureAttendanceDateColumn(subjectCode, lectureId, dateStr);
-
-  // 2. Read all student roll numbers (Column A)
+  // 2. Read all student roll numbers in this worksheet (Column A)
   const rollRows = await readRange(`${sheetName}!A2:A`);
   if (!rollRows || rollRows.length === 0) return { updatedCount: 0 };
 
@@ -619,11 +628,11 @@ async function updateSubjectAttendance(subjectCode, lectureId, dateStr, studentA
   for (const item of studentAttendanceList) {
     const roll = String(item.rollNumber || '').trim();
     const normRoll = roll.replace(/^0+/, '') || roll;
-    const isAbsent = item.status === 'Absent' || item.status === 'A';
+    const isAbsent = item.status === 'Absent' || item.status === 'A' || item.status === 'ABSENT';
     statusMap.set(normRoll, isAbsent ? ATTENDANCE_CELL_VALUES.ABSENT : ATTENDANCE_CELL_VALUES.PRESENT);
   }
 
-  // 4. Construct column values for each student row (present-by-default)
+  // 4. Construct column values for each student row in the worksheet (present-by-default)
   const colValues = [];
   for (let i = 0; i < rollRows.length; i++) {
     const roll = String(rollRows[i][0] || '').trim();
@@ -637,9 +646,8 @@ async function updateSubjectAttendance(subjectCode, lectureId, dateStr, studentA
   await updateRange(range, colValues);
 
   return {
-    subject: normalizeSubjectCode(subjectCode),
     sheetName,
-    lectureId,
+    sessionId,
     date: dateStr,
     colLetter,
     updatedCount: colValues.length,
@@ -647,27 +655,19 @@ async function updateSubjectAttendance(subjectCode, lectureId, dateStr, studentA
 }
 
 /**
- * Reads all attendance records from ATT_<SUBJECT>.
+ * Generic: Reads all attendance records from any attendance worksheet.
  * Converts matrix rows into normalized attendance records:
- * { date, lectureId, subjectCode, rollNumber, studentName, status }
+ * { date, sessionId, rollNumber, studentName, status }
  *
- * @param {string} subjectCode
+ * @param {string} sheetName
  * @returns {Promise<Array<object>>}
  */
-async function readSubjectAttendanceMatrix(subjectCode) {
-  const sub = normalizeSubjectCode(subjectCode);
-  const sheetName = getSubjectWorksheetName('ATT', sub);
-
+async function readWorksheetAttendanceMatrix(sheetName) {
   let rows = null;
   try {
     rows = await readRange(`${sheetName}!A:ZZ`);
   } catch (err) {
-    // Fallback: if ATT_<SUBJ> not yet created, check raw <SUBJ>
-    try {
-      rows = await readRange(`${sub}!A:ZZ`);
-    } catch (e) {
-      return [];
-    }
+    return [];
   }
 
   if (!rows || rows.length <= 1) return [];
@@ -675,7 +675,7 @@ async function readSubjectAttendanceMatrix(subjectCode) {
   const headers = rows[0];
   if (headers.length < 3) return [];
 
-  // Fetch cell notes for lectureId mapping
+  // Fetch cell notes for sessionId mapping
   const notes = [];
   try {
     const sheets = getSheetsClient();
@@ -710,15 +710,15 @@ async function readSubjectAttendanceMatrix(subjectCode) {
       const isAbsent = cellVal === 'A' || cellVal === 'ABSENT';
       const status = isAbsent ? 'Absent' : 'Present';
       const parsedDate = parseAttendanceDate(headerText);
-      const lectureId = notes[c] || `${parsedDate.replace(/-/g, '')}-${sub}-A-1`;
+      const sessionId = notes[c] || `${parsedDate.replace(/-/g, '')}-${sheetName}`;
 
       records.push({
         date: parsedDate,
-        lectureId,
-        subjectCode: sub,
+        sessionId,
         rollNumber,
         studentName,
         status,
+        sheetName,
       });
     }
   }
@@ -727,7 +727,84 @@ async function readSubjectAttendanceMatrix(subjectCode) {
 }
 
 /**
- * Reusable helper alias
+ * Ensures an attendance worksheet for the Redesigned Architecture exists.
+ * - Lecture: ATT-LEC-<SUB>
+ * - Practical: ATT-PR-<SUB>-<BATCH>
+ *
+ * @param {'LECTURE'|'PRACTICAL'} attendanceType
+ * @param {string} subjectCode
+ * @param {'A'|'B'|'C'|null} batch
+ * @param {Array<{ rollNumber: string|number, fullName: string }>} students
+ */
+async function ensureRedesignedAttendanceWorksheet(attendanceType, subjectCode, batch = null, students = []) {
+  const sheetName = getAttendanceWorksheetName(attendanceType, subjectCode, batch);
+  await ensureWorksheet(sheetName, SUBJECT_ATTENDANCE_HEADERS);
+
+  if (students && students.length > 0) {
+    const existing = await readRange(`${sheetName}!A:B`);
+    if (!existing || existing.length <= 1) {
+      const studentRows = students.map((s) => [Number(s.rollNumber) || s.rollNumber, String(s.fullName || '')]);
+      await updateRange(`${sheetName}!A2:B${1 + studentRows.length}`, studentRows);
+    }
+  }
+  return sheetName;
+}
+
+/**
+ * Updates attendance for a specific session (Lecture or Practical Batch)
+ * in its dedicated worksheet.
+ *
+ * @param {'LECTURE'|'PRACTICAL'} attendanceType
+ * @param {string} subjectCode
+ * @param {'A'|'B'|'C'|null} batch
+ * @param {string} sessionId
+ * @param {string} dateStr
+ * @param {Array<{ rollNumber: string|number, status: string }>} studentAttendanceList
+ */
+async function updateAttendanceSession(attendanceType, subjectCode, batch, sessionId, dateStr, studentAttendanceList) {
+  const sheetName = getAttendanceWorksheetName(attendanceType, subjectCode, batch);
+  return updateWorksheetAttendance(sheetName, sessionId, dateStr, studentAttendanceList);
+}
+
+/**
+ * Reads attendance matrix from a specific session worksheet (Lecture or Practical Batch).
+ *
+ * @param {'LECTURE'|'PRACTICAL'} attendanceType
+ * @param {string} subjectCode
+ * @param {'A'|'B'|'C'|null} batch
+ */
+async function readAttendanceSession(attendanceType, subjectCode, batch = null) {
+  const sheetName = getAttendanceWorksheetName(attendanceType, subjectCode, batch);
+  return readWorksheetAttendanceMatrix(sheetName);
+}
+
+/**
+ * Backward compatibility: Finds or creates a lecture date column in ATT_<SUBJECT>.
+ */
+async function ensureAttendanceDateColumn(subjectCode, lectureId, dateStr) {
+  const sheetName = getSubjectWorksheetName('ATT', subjectCode);
+  return ensureDateColumnForWorksheet(sheetName, lectureId, dateStr);
+}
+
+/**
+ * Backward compatibility: Updates attendance for a single lecture session in ATT_<SUBJECT>.
+ */
+async function updateSubjectAttendance(subjectCode, lectureId, dateStr, studentAttendanceList) {
+  const sheetName = getSubjectWorksheetName('ATT', subjectCode);
+  return updateWorksheetAttendance(sheetName, lectureId, dateStr, studentAttendanceList);
+}
+
+/**
+ * Backward compatibility: Reads all attendance records from ATT_<SUBJECT>.
+ */
+async function readSubjectAttendanceMatrix(subjectCode) {
+  const sub = normalizeSubjectCode(subjectCode);
+  const sheetName = getSubjectWorksheetName('ATT', sub);
+  return readWorksheetAttendanceMatrix(sheetName);
+}
+
+/**
+ * Reusable helper alias (backward compatibility)
  */
 async function getSubjectAttendance(subjectCode) {
   return readSubjectAttendanceMatrix(subjectCode);
@@ -917,5 +994,12 @@ module.exports = {
   getSubjectAttendance,
   updateSubjectMarks,
   readSubjectMarksMatrix,
+  // Redesigned Attendance Methods
+  ensureDateColumnForWorksheet,
+  updateWorksheetAttendance,
+  readWorksheetAttendanceMatrix,
+  ensureRedesignedAttendanceWorksheet,
+  updateAttendanceSession,
+  readAttendanceSession,
 };
 
