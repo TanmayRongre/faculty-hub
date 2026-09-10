@@ -190,7 +190,7 @@ const App = () => {
             }
           />
 
-          {/* Smart Scheduler & Timetable — Faculty + Admin */}
+          {/* Timetable — Faculty + Admin */}
           <Route
             path="/faculty/timetable"
             element={

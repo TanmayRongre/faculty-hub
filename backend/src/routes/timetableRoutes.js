@@ -6,10 +6,12 @@ const {
   createSlot,
   updateSlot,
   deleteSlot,
+  getFacultyAssignments,
 } = require('../controllers/timetableController');
 
-// All authenticated roles (student, faculty, admin) can view timetable
+// All authenticated roles (student, faculty, admin) can view timetable & faculty assignments
 router.get('/', protect, getTimetable);
+router.get('/faculty-assignments', protect, getFacultyAssignments);
 
 // Faculty & Admin can manage timetable slots
 router.post('/', protect, authorize('admin', 'faculty'), createSlot);

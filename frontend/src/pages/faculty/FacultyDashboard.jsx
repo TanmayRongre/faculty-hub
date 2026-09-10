@@ -27,7 +27,7 @@ import { ACADEMIC_CONFIG } from '../../config/academic';
 import FacultyLayout from './FacultyLayout';
 import { facultyService, academicService } from '../../services/managementService';
 import { taskService } from '../../services/taskService';
-import { getTimetable } from '../../services/schedulerService';
+import { getTimetable } from '../../services/timetableService';
 
 const PRIORITY_BADGES = {
   Urgent: 'bg-red-500/10 text-red-400 border-red-500/30',
@@ -159,7 +159,7 @@ const FacultyDashboard = () => {
     { label: 'Task Management', desc: 'Academic & administrative tasks', to: '/faculty/tasks', icon: CheckSquare },
     { label: 'Attendance', desc: 'Fast lecture attendance tracking', to: '/faculty/attendance', icon: CalendarCheck2 },
     { label: 'Marks Engine', desc: 'MSBTE PA1, PA2 & practical records', to: '/faculty/marks', icon: BarChart3 },
-    { label: 'Scheduler', desc: 'Weekly timetable & shifts', to: '/faculty/timetable', icon: CalendarDays },
+    { label: 'Timetable', desc: 'Weekly class timetable', to: '/faculty/timetable', icon: CalendarDays },
     { label: 'Academic Structure', desc: 'MSBTE curriculum & subjects', to: '/faculty/academic', icon: Library },
     { label: 'Campus Notices', desc: 'Broadcast circulars & updates', to: '/faculty/notices', icon: Megaphone },
     ...(isAdmin

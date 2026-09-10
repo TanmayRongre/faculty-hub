@@ -13,8 +13,6 @@ const sheetsRoutes = require('./src/routes/sheetsRoutes');
 const marksRoutes = require('./src/routes/marksRoutes');
 const attendanceRoutes = require('./src/routes/attendanceRoutes');
 const timetableRoutes = require('./src/routes/timetableRoutes');
-const holidayRoutes = require('./src/routes/holidayRoutes');
-const lectureRoutes = require('./src/routes/lectureRoutes');
 const noticeRoutes = require('./src/routes/noticeRoutes');
 const taskRoutes = require('./src/routes/taskRoutes');
 
@@ -103,8 +101,6 @@ app.use('/api/sheets', sheetsRoutes);
 app.use('/api/marks', marksRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/timetable', timetableRoutes);
-app.use('/api/holidays', holidayRoutes);
-app.use('/api/lectures', lectureRoutes);
 app.use('/api/notices', noticeRoutes);
 app.use('/api/tasks', taskRoutes);
 

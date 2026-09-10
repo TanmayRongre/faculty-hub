@@ -38,8 +38,6 @@ const Faculty = require('../models/Faculty');
 const Department = require('../models/Department');
 const Subject = require('../models/Subject');
 const TimetableSlot = require('../models/TimetableSlot');
-const Lecture = require('../models/Lecture');
-const Holiday = require('../models/Holiday');
 const Notice = require('../models/Notice');
 
 // Soft imports — models that may not exist in all versions
@@ -238,17 +236,9 @@ async function resetAndSeed() {
   // ─── STEP 2: WIPE (order matters — remove dependents first) ───────────────
   console.log('\n[STEP 2/9] Wiping all academic data...');
 
-  // Lectures (has refs to TimetableSlot, Student, Faculty, Subject, Holiday)
-  const lecturesDeleted = await Lecture.deleteMany({});
-  console.log(`  ✓ Lectures deleted:       ${lecturesDeleted.deletedCount}`);
-
   // TimetableSlots
   const slotsDeleted = await TimetableSlot.deleteMany({});
   console.log(`  ✓ TimetableSlots deleted: ${slotsDeleted.deletedCount}`);
-
-  // Holidays
-  const holidaysDeleted = await Holiday.deleteMany({});
-  console.log(`  ✓ Holidays deleted:       ${holidaysDeleted.deletedCount}`);
 
   // Notices
   const noticesDeleted = await Notice.deleteMany({});

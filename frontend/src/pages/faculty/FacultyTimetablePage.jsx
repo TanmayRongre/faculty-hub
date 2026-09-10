@@ -2,912 +2,631 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   CalendarDays,
   Clock,
-  PartyPopper,
-  AlertTriangle,
-  Plus,
   UserRound,
   Building2,
-  Zap,
-  Lightbulb,
-  CheckCircle2,
-  X,
-  RefreshCw,
+  BookOpen,
+  Activity,
+  Users,
+  GraduationCap,
+  Info,
+  ExternalLink,
+  AlertCircle,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import FacultyLayout from './FacultyLayout';
-import { academicService, facultyService } from '../../services/managementService';
-import {
-  getTimetable,
-  createTimetableSlot,
-  deleteTimetableSlot,
-  getHolidays,
-  createHoliday,
-  deleteHoliday,
-  getLectures,
-  getReschedulingRequired,
-  rescheduleLecture,
-} from '../../services/schedulerService';
 import { INSTITUTION } from '../../config/institution';
 import { ACADEMIC_CONFIG } from '../../config/academic';
+import { facultyService } from '../../services/managementService';
+import { getFacultyAssignments } from '../../services/timetableService';
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+// ─── TIMETABLE DATA DEFINITIONS ──────────────────────────────────────────────
+// Subjects and rooms are fixed according to Semester V CE official curriculum.
+// Faculty names are dynamically resolved from Admin Panel -> Faculty Management.
+
+const MORNING_SLOTS = ['10:30–11:30', '11:30–12:30', '12:30–1:30'];
+
+const MORNING_SCHEDULE = [
+  {
+    day: 'Monday',
+    slots: [
+      { subject: 'STE', room: '109' },
+      { subject: 'OSY', room: '109' },
+      { subject: 'ACN', room: '109' },
+    ],
+  },
+  {
+    day: 'Tuesday',
+    slots: [
+      { subject: 'ACN', room: '109' },
+      { subject: 'OSY', room: '109' },
+      { subject: 'STE', room: '109' },
+    ],
+  },
+  {
+    day: 'Wednesday',
+    slots: [
+      { subject: 'OSY', room: '109' },
+      { subject: 'ACN', room: '109' },
+      { subject: 'STE', room: '109' },
+    ],
+  },
+  {
+    day: 'Thursday',
+    slots: [
+      { subject: 'OSY', room: '109' },
+      { subject: 'STE', room: '109' },
+      { subject: 'ENDS', room: '109' },
+    ],
+  },
+  {
+    day: 'Friday',
+    slots: [
+      { subject: 'ACN', room: '109' },
+      { subject: 'OSY', room: '109' },
+      { isOff: true },
+    ],
+  },
+];
+
+const AFTERNOON_SCHEDULE = [
+  {
+    day: 'Monday',
+    rows: [
+      {
+        time: '1:50–2:50',
+        batchA: { subject: 'OSY', room: 'CL5' },
+        batchB: { subject: 'STE', room: 'CL7' },
+        batchC: { subject: 'ENDS', room: '109' },
+      },
+      {
+        time: '2:50–3:50',
+        batchA: { subject: 'STE', room: 'CL7' },
+        batchB: { subject: 'ACN', room: 'CL5' },
+        batchC: { type: 'library', label: 'Library Time' },
+      },
+    ],
+  },
+  {
+    day: 'Tuesday',
+    rows: [
+      {
+        time: '1:50–2:50',
+        batchA: { subject: 'ACN', room: 'CL5' },
+        batchB: { type: 'library', label: 'Library Time' },
+        batchC: { subject: 'STE', room: 'CL6' },
+      },
+      {
+        time: '4:00–5:00',
+        isCommon: true,
+        type: 'sports',
+        label: 'Cocurricular Activities / Sports Time',
+      },
+    ],
+  },
+  {
+    day: 'Wednesday',
+    rows: [
+      {
+        time: '1:50–2:50',
+        batchA: { subject: 'STE', room: 'CL6' },
+        batchB: { subject: 'ENDS', room: '109' },
+        batchC: { subject: 'OSY', room: 'CL5' },
+      },
+      {
+        time: '4:00–5:00',
+        isCommon: true,
+        type: 'sports',
+        label: 'Cocurricular Activities / Sports Time',
+      },
+    ],
+  },
+  {
+    day: 'Thursday',
+    rows: [
+      {
+        time: '1:50–2:50',
+        batchA: { type: 'library', label: 'Library Time' },
+        batchB: { subject: 'OSY', room: 'CL5' },
+        batchC: { subject: 'STE', room: 'CL7' },
+      },
+      {
+        time: '4:00–5:00',
+        batchA: { subject: 'SPI', room: 'CL1' },
+        batchB: { subject: 'SPI', room: 'CL5' },
+        batchC: { subject: 'SPI', room: 'CL7' },
+      },
+    ],
+  },
+  {
+    day: 'Friday',
+    rows: [
+      {
+        time: '1:50–2:50',
+        batchA: { subject: 'ENDS', room: '109' },
+        batchB: { subject: 'STE', room: 'CL7' },
+        batchC: { subject: 'ACN', room: 'CL5' },
+      },
+    ],
+  },
+];
+
+// Subject theme tokens for consistent aesthetics
+const SUBJECT_THEMES = {
+  STE: {
+    bg: 'bg-blue-950/40',
+    border: 'border-blue-700/50',
+    badgeBg: 'bg-blue-900/60',
+    text: 'text-blue-300',
+    roomText: 'text-blue-400',
+  },
+  OSY: {
+    bg: 'bg-emerald-950/40',
+    border: 'border-emerald-700/50',
+    badgeBg: 'bg-emerald-900/60',
+    text: 'text-emerald-300',
+    roomText: 'text-emerald-400',
+  },
+  ACN: {
+    bg: 'bg-purple-950/40',
+    border: 'border-purple-700/50',
+    badgeBg: 'bg-purple-900/60',
+    text: 'text-purple-300',
+    roomText: 'text-purple-400',
+  },
+  ENDS: {
+    bg: 'bg-amber-950/40',
+    border: 'border-amber-700/50',
+    badgeBg: 'bg-amber-900/60',
+    text: 'text-amber-300',
+    roomText: 'text-amber-400',
+  },
+  SPI: {
+    bg: 'bg-cyan-950/40',
+    border: 'border-cyan-700/50',
+    badgeBg: 'bg-cyan-900/60',
+    text: 'text-cyan-300',
+    roomText: 'text-cyan-400',
+  },
+};
+
+const LEGEND_ITEMS = [
+  { code: 'STE', name: 'Software Testing', color: 'text-blue-400' },
+  { code: 'OSY', name: 'Operating System', color: 'text-emerald-400' },
+  { code: 'ACN', name: 'Advanced Computer Network', color: 'text-purple-400' },
+  { code: 'ENDS', name: 'Environmental Studies', color: 'text-amber-400' },
+  { code: 'SPI', name: 'Scripting Language (Python)', color: 'text-cyan-400' },
+];
+
+// ─── DYNAMIC TIMETABLE CELL RENDERER ─────────────────────────────────────────
+
+const TimetableCell = ({ item, assignedFacultyName }) => {
+  if (!item) return null;
+
+  if (item.isOff) {
+    return (
+      <div className="bg-slate-900/60 border border-dashed border-slate-800 rounded-lg p-2.5 flex items-center justify-center min-h-[76px] text-xs font-bold text-slate-500 uppercase tracking-wider">
+        OFF
+      </div>
+    );
+  }
+
+  if (item.type === 'library') {
+    return (
+      <div className="bg-indigo-950/30 border border-indigo-800/40 rounded-lg p-2.5 flex items-center justify-center gap-1.5 min-h-[76px] text-xs font-semibold text-indigo-300">
+        <BookOpen size={13} className="text-indigo-400 shrink-0" aria-hidden="true" />
+        <span>Library Time</span>
+      </div>
+    );
+  }
+
+  if (item.type === 'sports') {
+    return (
+      <div className="bg-emerald-950/30 border border-emerald-800/40 rounded-lg p-2.5 flex items-center justify-center gap-2 min-h-[60px] text-xs font-semibold text-emerald-300">
+        <Activity size={13} className="text-emerald-400 shrink-0" aria-hidden="true" />
+        <span>Cocurricular Activities / Sports Time</span>
+      </div>
+    );
+  }
+
+  const theme = SUBJECT_THEMES[item.subject] || {
+    bg: 'bg-slate-800/60',
+    border: 'border-slate-700/60',
+    badgeBg: 'bg-slate-800',
+    text: 'text-white',
+    roomText: 'text-slate-300',
+  };
+
+  return (
+    <div
+      className={`${theme.bg} border ${theme.border} rounded-lg p-2.5 flex flex-col justify-between min-h-[76px] hover:border-slate-500 transition-colors shadow-xs`}
+    >
+      {/* Top: Subject code & Room */}
+      <div className="flex items-center justify-between gap-1 mb-1.5">
+        <span className={`font-bold text-sm tracking-wide ${theme.text}`}>
+          {item.subject}
+        </span>
+        <span
+          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border border-slate-700/60 ${theme.badgeBg} ${theme.roomText}`}
+        >
+          Room {item.room}
+        </span>
+      </div>
+
+      {/* Bottom: Dynamically assigned faculty */}
+      <div className="flex items-center gap-1.5 text-xs">
+        <UserRound size={11} className="text-slate-400 shrink-0" aria-hidden="true" />
+        <span className="text-slate-400 text-[11px]">Faculty:</span>
+        {assignedFacultyName ? (
+          <span className="text-white font-medium truncate" title={assignedFacultyName}>
+            {assignedFacultyName}
+          </span>
+        ) : (
+          <span className="text-amber-400/90 font-medium italic text-[11px]">
+            Not Assigned
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── MAIN TIMETABLE PAGE COMPONENT ───────────────────────────────────────────
 
 const FacultyTimetablePage = () => {
-  const navigate = useNavigate();
+  // Current Day of Week Detection
+  const currentDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
 
-  // Tabs: 'timetable' | 'today' | 'holidays' | 'reschedule'
-  const [activeTab, setActiveTab] = useState('timetable');
-
-  // Academic Scope: Semester 5, Computer Science
-  const [semester] = useState(5);
-
-  // Data state
-  const [timetableData, setTimetableData] = useState({ totalSlots: 0, days: {} });
-  const [todayLectures, setTodayLectures] = useState([]);
-  const [holidays, setHolidays] = useState([]);
-  const [pendingReschedules, setPendingReschedules] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  // Form metadata
-  const [subjects, setSubjects] = useState([]);
+  // Dynamic faculty assignments loaded from database (Admin Panel -> Faculty Management)
+  const [facultyAssignments, setFacultyAssignments] = useState({});
   const [facultyList, setFacultyList] = useState([]);
-  const [departments, setDepartments] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Add Slot Modal
-  const [showAddSlot, setShowAddSlot] = useState(false);
-  const [newSlot, setNewSlot] = useState({
-    faculty: '',
-    subject: '',
-    department: '',
-    semester: 5,
-    dayOfWeek: 'Monday',
-    startTime: '09:00',
-    endTime: '10:00',
-    room: 'Room 201',
-    lectureType: 'theory',
-  });
-  const [savingSlot, setSavingSlot] = useState(false);
-
-  // Add Holiday Modal
-  const [showAddHoliday, setShowAddHoliday] = useState(false);
-  const [newHoliday, setNewHoliday] = useState({
-    date: new Date().toISOString().split('T')[0],
-    title: '',
-    type: 'national',
-  });
-  const [savingHoliday, setSavingHoliday] = useState(false);
-
-  // Manual Reschedule Modal
-  const [selectedLectureForReschedule, setSelectedLectureForReschedule] = useState(null);
-  const [manualRescheduleData, setManualRescheduleData] = useState({
-    newDate: new Date().toISOString().split('T')[0],
-    newStartTime: '14:00',
-    newEndTime: '15:00',
-    newRoom: 'Room 201',
-    reason: 'Faculty adjustment',
-  });
-  const [rescheduling, setRescheduling] = useState(false);
-
-  // Load Metadata
-  useEffect(() => {
-    academicService.getDepartments().then((d) => setDepartments(d.data || [])).catch(() => {});
-    academicService.getSubjects({ limit: 100, semester: 5 }).then((d) => setSubjects(d.data || [])).catch(() => {});
-    facultyService.getFacultyList({ limit: 100 }).then((d) => setFacultyList(d.data || [])).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (departments.length > 0 && !newSlot.department) {
-      setNewSlot((prev) => ({ ...prev, department: departments[0]._id }));
-    }
-  }, [departments]);
-
-  // Load Timetable
-  const loadTimetable = useCallback(() => {
+  const loadAssignments = useCallback(async () => {
     setLoading(true);
-    getTimetable({ semester: 5 })
-      .then((d) => setTimetableData(d.data || { totalSlots: 0, days: {} }))
-      .catch((err) => {
-        console.error('Failed to load timetable:', err);
-        setTimetableData({ totalSlots: 0, days: {} });
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    try {
+      const [assignmentsRes, facultyRes] = await Promise.all([
+        getFacultyAssignments().catch(() => ({ data: {} })),
+        facultyService.getFacultyList({ limit: 100 }).catch(() => ({ data: [] })),
+      ]);
 
-  // Load Today's Lectures
-  const loadTodayLectures = useCallback(() => {
-    const today = new Date().toISOString().split('T')[0];
-    getLectures({ date: today, semester: 5 })
-      .then((d) => setTodayLectures(d.data || []))
-      .catch(() => setTodayLectures([]));
-  }, []);
-
-  // Load Holidays
-  const loadHolidays = useCallback(() => {
-    getHolidays()
-      .then((d) => setHolidays(d.data || []))
-      .catch(() => setHolidays([]));
-  }, []);
-
-  // Load Rescheduling Required
-  const loadReschedules = useCallback(() => {
-    getReschedulingRequired({ semester: 5 })
-      .then((d) => setPendingReschedules(d.data || []))
-      .catch(() => setPendingReschedules([]));
+      setFacultyAssignments(assignmentsRes.data || {});
+      setFacultyList(facultyRes.data || []);
+    } catch (err) {
+      console.error('Failed to load faculty assignments for timetable:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'timetable') loadTimetable();
-    if (activeTab === 'today') loadTodayLectures();
-    if (activeTab === 'holidays') loadHolidays();
-    if (activeTab === 'reschedule') loadReschedules();
-  }, [activeTab, loadTimetable, loadTodayLectures, loadHolidays, loadReschedules]);
+    loadAssignments();
+  }, [loadAssignments]);
 
-  // Handle create slot
-  const handleCreateSlot = async (e) => {
-    e.preventDefault();
-    if (!newSlot.faculty) return toast.error('Please select a faculty member');
-    if (!newSlot.subject) return toast.error('Please select a subject');
+  /**
+   * Resolves assigned faculty name dynamically for a subject code.
+   * If subject is assigned to a faculty member in database -> returns faculty name.
+   * If not assigned -> returns null (cell renders 'Faculty: Not Assigned').
+   */
+  const getAssignedFacultyForSubject = (subjectCode) => {
+    if (!subjectCode) return null;
+    const code = subjectCode.toUpperCase();
 
-    setSavingSlot(true);
-    try {
-      await createTimetableSlot(newSlot);
-      toast.success('Timetable slot added successfully');
-      setShowAddSlot(false);
-      loadTimetable();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to add timetable slot');
-    } finally {
-      setSavingSlot(false);
+    // 1. Check direct dictionary from getFacultyAssignments
+    const assignedFromApi = facultyAssignments[code];
+    if (assignedFromApi && assignedFromApi.length > 0) {
+      return assignedFromApi.map((f) => f.fullName).join(', ');
     }
-  };
 
-  // Handle delete slot
-  const handleDeleteSlot = async (id) => {
-    if (!window.confirm('Are you sure you want to deactivate this timetable slot?')) return;
-    try {
-      await deleteTimetableSlot(id);
-      toast.success('Slot removed');
-      loadTimetable();
-    } catch (err) {
-      toast.error('Failed to remove slot');
+    // 2. Fallback to facultyList inspection
+    const matches = facultyList.filter(
+      (f) => f.status !== 'inactive' && f.subjects?.some((s) => s.subjectCode === code)
+    );
+    if (matches.length > 0) {
+      return matches.map((f) => f.fullName).join(', ');
     }
-  };
 
-  // Handle create holiday
-  const handleCreateHoliday = async (e) => {
-    e.preventDefault();
-    if (!newHoliday.date) return toast.error('Date is required');
-    if (!newHoliday.title) return toast.error('Title is required');
-
-    setSavingHoliday(true);
-    try {
-      const res = await createHoliday(newHoliday);
-      toast.success(res.message || 'Holiday added');
-      setShowAddHoliday(false);
-      loadHolidays();
-      loadReschedules();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create holiday');
-    } finally {
-      setSavingHoliday(false);
-    }
-  };
-
-  // Handle delete holiday
-  const handleDeleteHoliday = async (id) => {
-    if (!window.confirm('Cancel this holiday and restore original scheduled lectures?')) return;
-    try {
-      await deleteHoliday(id);
-      toast.success('Holiday cancelled and lectures restored');
-      loadHolidays();
-      loadReschedules();
-    } catch (err) {
-      toast.error('Failed to cancel holiday');
-    }
-  };
-
-  // Handle manual reschedule
-  const handleManualReschedule = async (e) => {
-    e.preventDefault();
-    if (!selectedLectureForReschedule) return;
-
-    setRescheduling(true);
-    try {
-      await rescheduleLecture(selectedLectureForReschedule._id, manualRescheduleData);
-      toast.success('Lecture manually rescheduled successfully');
-      setSelectedLectureForReschedule(null);
-      loadReschedules();
-      if (activeTab === 'today') loadTodayLectures();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to reschedule lecture');
-    } finally {
-      setRescheduling(false);
-    }
+    return null;
   };
 
   return (
     <FacultyLayout>
-      <div className="p-4 sm:p-6 md:p-8 max-w-7xl">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-8">
+        {/* 1. Page Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
           <div>
             <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
-              {INSTITUTION.name} • {ACADEMIC_CONFIG.DEPARTMENT.name}
+              {INSTITUTION.name}
             </div>
-            <h1 className="text-2xl font-bold text-white">Smart Lecture Timetable & Scheduler</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              Timetable
+            </h1>
             <p className="text-slate-400 mt-1 text-sm">
-              Weekly schedule & automated conflict-free holiday shifting for <strong className="text-white">{ACADEMIC_CONFIG.SEMESTER.displayName}</strong>.
+              <strong className="text-white">Computer Engineering • Semester V</strong>
             </p>
           </div>
 
-          {/* Tab Navigation */}
-          <div className="flex flex-wrap bg-slate-900 border border-slate-800 rounded-xl p-1">
-            <button
-              onClick={() => setActiveTab('timetable')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeTab === 'timetable'
-                  ? 'bg-blue-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <CalendarDays size={14} aria-hidden="true" />
-              <span>Timetable</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('today')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeTab === 'today'
-                  ? 'bg-blue-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Clock size={14} aria-hidden="true" />
-              <span>Today's Sessions</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('holidays')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeTab === 'holidays'
-                  ? 'bg-blue-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <PartyPopper size={14} aria-hidden="true" />
-              <span>Holidays & Shift</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('reschedule')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeTab === 'reschedule'
-                  ? 'bg-amber-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <AlertTriangle size={14} aria-hidden="true" />
-              <span>Reschedule Required</span>
-              {pendingReschedules.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-red-500 text-white font-bold">
-                  {pendingReschedules.length}
-                </span>
-              )}
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+              <Users size={13} className="text-blue-400" aria-hidden="true" />
+              <span>68 Students Enrolled</span>
+            </span>
+            <span className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+              <GraduationCap size={13} className="text-emerald-400" aria-hidden="true" />
+              <span>Batches: A (1–24), B (25–47), C (48–68)</span>
+            </span>
           </div>
         </div>
 
-        {/* Global Context Bar & Action Button */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3 text-xs text-slate-300">
-            <span className="px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 font-bold text-blue-400">
-              Department: {ACADEMIC_CONFIG.DEPARTMENT.name}
-            </span>
-            <span className="px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 font-bold text-emerald-400">
-              {ACADEMIC_CONFIG.SEMESTER.displayName}
+        {/* 2. Morning / Written Timetable */}
+        <section className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <CalendarDays size={18} className="text-blue-400" aria-hidden="true" />
+                <span>Morning — Written Lectures</span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Common lecture sessions for all 68 students • Conducted in Room 109
+              </p>
+            </div>
+            <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded border border-slate-800 self-start sm:self-auto">
+              10:30 AM – 1:30 PM
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            {activeTab === 'timetable' && (
-              <button
-                onClick={() => setShowAddSlot(true)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-blue-900/30 transition-all flex items-center gap-2"
-              >
-                <Plus size={14} aria-hidden="true" />
-                <span>Add Timetable Slot</span>
-              </button>
-            )}
-            {activeTab === 'holidays' && (
-              <button
-                onClick={() => setShowAddHoliday(true)}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-emerald-900/30 transition-all flex items-center gap-2"
-              >
-                <PartyPopper size={14} aria-hidden="true" />
-                <span>Declare Holiday</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* ─── TAB 1: WEEKLY TIMETABLE GRID ──────────────────────────────────── */}
-        {activeTab === 'timetable' && (
-          <div>
-            {loading ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-16 text-center">
-                <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <div className="text-slate-400 text-sm">Loading weekly schedule...</div>
-              </div>
-            ) : !timetableData || (timetableData.totalSlots || 0) === 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-16 text-center">
-                <div className="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-3">
-                  <CalendarDays size={24} className="text-slate-500" aria-hidden="true" />
-                </div>
-                <div className="text-lg font-semibold text-white">No Timetable Slots Found</div>
-                <p className="text-slate-400 text-sm mt-1 mb-4">
-                  {ACADEMIC_CONFIG.SEMESTER.displayName} has no active timetable slots configured yet.
-                </p>
-                <button
-                  onClick={() => setShowAddSlot(true)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg"
-                >
-                  Create First Slot
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {DAYS.map((day) => {
-                  const daySlots = timetableData?.days?.[day] || [];
-                  return (
-                    <div key={day} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col shadow-lg">
-                      <div className="bg-slate-800/80 px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-                        <span className="font-bold text-white text-sm">{day}</span>
-                        <span className="text-xs font-mono text-slate-400">{daySlots.length} sessions</span>
+          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 shadow-xl">
+            <table className="w-full min-w-[680px] border-collapse text-left">
+              <thead>
+                <tr className="bg-slate-800/80 border-b border-slate-700/80 text-xs font-semibold text-slate-300">
+                  <th className="py-3 px-4 w-36">Day</th>
+                  {MORNING_SLOTS.map((slot) => (
+                    <th key={slot} className="py-3 px-4 font-mono text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <Clock size={12} className="text-blue-400" aria-hidden="true" />
+                        <span>{slot}</span>
                       </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800 text-sm">
+                {MORNING_SCHEDULE.map((row) => {
+                  const isToday = row.day === currentDayName;
+                  return (
+                    <tr
+                      key={row.day}
+                      className={`transition-colors ${
+                        isToday
+                          ? 'bg-blue-950/25 hover:bg-blue-950/35 border-l-4 border-l-blue-500'
+                          : 'hover:bg-slate-800/30'
+                      }`}
+                    >
+                      <td className="py-3.5 px-4 font-semibold text-white">
+                        <div className="flex items-center gap-2">
+                          <span>{row.day}</span>
+                          {isToday && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-500 text-white">
+                              Today
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      {row.slots.map((slot, idx) => (
+                        <td key={idx} className="py-2.5 px-3">
+                          <TimetableCell
+                            item={slot}
+                            assignedFacultyName={getAssignedFacultyForSubject(slot.subject)}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-                      <div className="p-4 space-y-3 flex-1">
-                        {daySlots.length === 0 ? (
-                          <div className="text-center py-8 text-slate-500 text-xs italic">
-                            No sessions scheduled
+        {/* 3. Afternoon Practical / Batch Timetable */}
+        <section className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Users size={18} className="text-purple-400" aria-hidden="true" />
+                <span>Afternoon — Practical / Batch Schedule</span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Batch-wise lab practicals and student co-curricular activities
+              </p>
+            </div>
+            <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded border border-slate-800 self-start sm:self-auto">
+              1:50 PM – 5:00 PM
+            </span>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 shadow-xl">
+            <table className="w-full min-w-[760px] border-collapse text-left">
+              <thead>
+                <tr className="bg-slate-800/80 border-b border-slate-700/80 text-xs font-semibold text-slate-300">
+                  <th className="py-3 px-4 w-32">Day</th>
+                  <th className="py-3 px-3 w-32 font-mono text-center">Time</th>
+                  <th className="py-3 px-3 text-center">
+                    <div className="font-bold text-white">Batch A</div>
+                    <div className="text-[10px] text-slate-400 font-normal">Roll 1–24 (24)</div>
+                  </th>
+                  <th className="py-3 px-3 text-center">
+                    <div className="font-bold text-white">Batch B</div>
+                    <div className="text-[10px] text-slate-400 font-normal">Roll 25–47 (23)</div>
+                  </th>
+                  <th className="py-3 px-3 text-center">
+                    <div className="font-bold text-white">Batch C</div>
+                    <div className="text-[10px] text-slate-400 font-normal">Roll 48–68 (21)</div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800 text-sm">
+                {AFTERNOON_SCHEDULE.map((dayGroup) => {
+                  const isToday = dayGroup.day === currentDayName;
+                  return dayGroup.rows.map((row, rIdx) => (
+                    <tr
+                      key={`${dayGroup.day}-${rIdx}`}
+                      className={`transition-colors ${
+                        isToday
+                          ? 'bg-purple-950/20 hover:bg-purple-950/30 border-l-4 border-l-purple-500'
+                          : 'hover:bg-slate-800/30'
+                      }`}
+                    >
+                      {rIdx === 0 && (
+                        <td
+                          rowSpan={dayGroup.rows.length}
+                          className="py-3 px-4 font-semibold text-white border-r border-slate-800/80 align-middle bg-slate-900/40"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span>{dayGroup.day}</span>
+                            {isToday && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500 text-white">
+                                Today
+                              </span>
+                            )}
                           </div>
+                        </td>
+                      )}
+                      <td className="py-2.5 px-3 font-mono text-xs text-slate-300 text-center border-r border-slate-800/60 whitespace-nowrap">
+                        {row.time}
+                      </td>
+
+                      {row.isCommon ? (
+                        <td colSpan={3} className="py-2.5 px-3">
+                          <TimetableCell item={row} />
+                        </td>
+                      ) : (
+                        <>
+                          <td className="py-2.5 px-3">
+                            <TimetableCell
+                              item={row.batchA}
+                              assignedFacultyName={getAssignedFacultyForSubject(row.batchA?.subject)}
+                            />
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <TimetableCell
+                              item={row.batchB}
+                              assignedFacultyName={getAssignedFacultyForSubject(row.batchB?.subject)}
+                            />
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <TimetableCell
+                              item={row.batchC}
+                              assignedFacultyName={getAssignedFacultyForSubject(row.batchC?.subject)}
+                            />
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ));
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* 4. Subject & Dynamic Faculty Reference Card */}
+        <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4">
+          <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
+              <Info size={14} className="text-blue-400" aria-hidden="true" />
+              <span>Course Curriculum & Dynamic Faculty Assignments</span>
+            </div>
+            <Link
+              to="/faculty/faculty"
+              className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 transition-colors"
+            >
+              <span>Manage in Faculty Management</span>
+              <ExternalLink size={12} aria-hidden="true" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Subjects Reference */}
+            <div>
+              <div className="text-xs font-semibold text-slate-400 mb-2">Prescribed Course Codes</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {LEGEND_ITEMS.map((sub) => {
+                  const assigned = getAssignedFacultyForSubject(sub.code);
+                  return (
+                    <div
+                      key={sub.code}
+                      className="p-2.5 rounded-lg bg-slate-800/50 border border-slate-700/50 flex flex-col justify-between"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`font-bold text-xs ${sub.color}`}>{sub.code}</span>
+                        {assigned ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
+                            Assigned
+                          </span>
                         ) : (
-                          daySlots.map((slot) => (
-                            <div
-                              key={slot._id}
-                              className="bg-slate-800/50 border border-slate-700/60 rounded-xl p-3.5 hover:border-slate-600 transition-all relative group"
-                            >
-                              <div className="flex items-center justify-between mb-1.5">
-                                <span className="font-mono text-xs font-bold text-blue-400">
-                                  {slot.startTime} – {slot.endTime}
-                                </span>
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-800 text-slate-300 border border-slate-700">
-                                  {slot.lectureType || 'Theory'}
-                                </span>
-                              </div>
-
-                              <div className="font-bold text-white text-sm">{slot.subjectCode}</div>
-                              <div className="text-xs text-slate-400 truncate">
-                                {slot.subjectName || slot.subject?.subjectName}
-                              </div>
-
-                              <div className="mt-2 pt-2 border-t border-slate-700/40 flex items-center justify-between text-xs text-slate-400">
-                                <span className="flex items-center gap-1">
-                                  <UserRound size={12} aria-hidden="true" />
-                                  {slot.faculty?.fullName || slot.faculty?.name || 'Faculty'}
-                                </span>
-                                <span className="font-mono text-slate-300 flex items-center gap-1">
-                                  <Building2 size={12} aria-hidden="true" />
-                                  {slot.room || 'Classroom'}
-                                </span>
-                              </div>
-
-                              {/* Delete Action on Hover */}
-                              <button
-                                onClick={() => handleDeleteSlot(slot._id)}
-                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-300 text-xs px-1.5 py-0.5 rounded bg-red-950/80 border border-red-800/60"
-                                title="Remove Slot"
-                              >
-                                <X size={12} aria-hidden="true" />
-                              </button>
-                            </div>
-                          ))
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/60 text-amber-400 border border-amber-800/40">
+                            Not Assigned
+                          </span>
                         )}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">{sub.name}</div>
+                      <div className="text-[11px] text-slate-300 font-medium mt-1 truncate">
+                        {assigned || <span className="text-amber-400/80 italic">Not Assigned</span>}
                       </div>
                     </div>
                   );
                 })}
               </div>
-            )}
-          </div>
-        )}
-
-        {/* ─── TAB 2: TODAY'S SESSIONS ───────────────────────────────────────── */}
-        {activeTab === 'today' && (
-          <div className="space-y-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-              <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-                <h3 className="text-base font-bold text-white">Dynamic Session Feed for Today</h3>
-                <span className="text-xs text-slate-400 font-mono">
-                  {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                </span>
-              </div>
-
-              {todayLectures.length === 0 ? (
-                <div className="p-12 text-center text-slate-500 text-sm">
-                  No lectures scheduled for today.
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-800/60">
-                  {todayLectures.map((lec) => (
-                    <div key={lec._id} className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-800/20">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-white text-base">{lec.subjectCode}</span>
-                          <span className="text-xs text-slate-400">— {lec.subjectName || lec.subject?.subjectName}</span>
-                        </div>
-                        <div className="text-xs text-slate-400 mt-1 flex items-center gap-3">
-                          <span className="font-mono text-blue-400 font-bold">{lec.startTime} – {lec.endTime}</span>
-                          <span>|</span>
-                          <span>Faculty: {lec.faculty?.fullName || lec.faculty?.name || 'Faculty'}</span>
-                          <span>|</span>
-                          <span>Room: {lec.room}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
-                            lec.status === 'scheduled'
-                              ? 'bg-blue-950/80 text-blue-400 border border-blue-800/40'
-                              : lec.status === 'shifted_due_to_holiday'
-                              ? 'bg-purple-950/80 text-purple-400 border border-purple-800/40'
-                              : 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/40'
-                          }`}
-                        >
-                          {lec.status}
-                        </span>
-
-                        <button
-                          onClick={() => navigate('/faculty/attendance')}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow flex items-center gap-1"
-                        >
-                          <Zap size={13} aria-hidden="true" />
-                          <span>Attendance</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ─── TAB 3: HOLIDAYS & SHIFT LOGIC ─────────────────────────────────── */}
-        {activeTab === 'holidays' && (
-          <div className="space-y-6">
-            <div className="bg-purple-950/20 border border-purple-800/30 rounded-xl p-4 text-xs text-purple-300 flex items-center gap-3">
-              <Lightbulb size={18} className="text-purple-400 shrink-0" aria-hidden="true" />
-              <div>
-                <strong>Automated Holiday Shift:</strong> When an academic holiday is declared, the scheduler automatically marks falling lectures as shifted and deterministically reschedules them to the nearest conflict-free slot.
-              </div>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-              <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-white">Academic Calendar Holidays</h3>
-                <span className="text-xs text-slate-400 font-mono">{holidays.length} configured</span>
+            {/* Dynamic Faculty Roster */}
+            <div>
+              <div className="text-xs font-semibold text-slate-400 mb-2">
+                Active Faculty Members ({facultyList.length})
               </div>
-
-              {holidays.length === 0 ? (
-                <div className="p-12 text-center text-slate-500 text-sm">
-                  No holidays declared yet. Click "Declare Holiday" above to add one.
+              {loading ? (
+                <div className="text-xs text-slate-500 py-6 text-center">Loading faculty assignments...</div>
+              ) : facultyList.length === 0 ? (
+                <div className="p-4 rounded-lg bg-slate-800/40 border border-slate-700/40 text-xs text-slate-400 flex items-start gap-2">
+                  <AlertCircle size={14} className="text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+                  <div>
+                    No faculty members found in the system. Add faculty and assign subjects in{' '}
+                    <Link to="/faculty/faculty" className="text-blue-400 underline">
+                      Faculty Management
+                    </Link>{' '}
+                    to reflect them dynamically on this timetable.
+                  </div>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-800 text-slate-400 text-xs">
-                        <th className="text-left px-4 py-3 font-medium">Date</th>
-                        <th className="text-left px-4 py-3 font-medium">Holiday Title</th>
-                        <th className="text-center px-4 py-3 font-medium">Category</th>
-                        <th className="text-center px-4 py-3 font-medium">Lectures Shifted</th>
-                        <th className="text-center px-4 py-3 font-medium">Status</th>
-                        <th className="text-right px-4 py-3 font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/50">
-                      {holidays.map((h) => (
-                        <tr key={h._id} className="hover:bg-slate-800/20">
-                          <td className="px-4 py-3 font-mono text-xs text-white">{h.date}</td>
-                          <td className="px-4 py-3 text-white font-medium">{h.title}</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold uppercase bg-slate-800 text-slate-300 border border-slate-700">
-                              {h.type}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center font-mono text-emerald-400 font-bold">
-                            {h.affectedLecturesCount || 0}
-                          </td>
-                          <td className="px-4 py-3 text-center">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[220px] overflow-y-auto pr-1">
+                  {facultyList.map((fac) => (
+                    <div
+                      key={fac._id}
+                      className="p-2.5 rounded-lg bg-slate-800/50 border border-slate-700/50 flex flex-col justify-between"
+                    >
+                      <div className="font-semibold text-xs text-white truncate">{fac.fullName}</div>
+                      <div className="text-[10px] text-slate-400">{fac.designation}</div>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {fac.subjects && fac.subjects.length > 0 ? (
+                          fac.subjects.map((s) => (
                             <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                h.status === 'active'
-                                  ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-700/40'
-                                  : 'bg-slate-800 text-slate-500'
-                              }`}
+                              key={s._id || s.subjectCode}
+                              className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-blue-950 text-blue-300 border border-blue-800/50"
                             >
-                              {h.status}
+                              {s.subjectCode}
                             </span>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {h.status === 'active' && (
-                              <button
-                                onClick={() => handleDeleteHoliday(h._id)}
-                                className="px-2.5 py-1 rounded text-xs font-medium bg-red-950/40 border border-red-800/40 text-red-400 hover:bg-red-900/50 transition-colors"
-                              >
-                                Cancel & Restore
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ─── TAB 4: RESCHEDULING REQUIRED ──────────────────────────────────── */}
-        {activeTab === 'reschedule' && (
-          <div className="space-y-4">
-            <div className="bg-amber-950/20 border border-amber-800/40 rounded-xl p-4 text-xs text-amber-300 flex items-center gap-3">
-              <AlertTriangle size={18} className="text-amber-400 shrink-0" aria-hidden="true" />
-              <div>
-                <strong>Manual Adjustment Needed:</strong> The lectures below could not be automatically shifted because lookahead slots had conflicts.
-              </div>
-            </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-              <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-white">Pending Rescheduling Queue</h3>
-                <span className="text-xs text-amber-400 font-mono font-bold">
-                  {pendingReschedules.length} pending
-                </span>
-              </div>
-
-              {pendingReschedules.length === 0 ? (
-                <div className="p-12 text-center text-slate-500 text-sm flex flex-col items-center gap-2">
-                  <CheckCircle2 size={24} className="text-emerald-500" aria-hidden="true" />
-                  <span>No pending reschedules! All holiday-affected lectures were shifted.</span>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-800/50">
-                  {pendingReschedules.map((lec) => (
-                    <div key={lec._id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-800/20">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-white">{lec.subjectCode}</span>
-                          <span className="text-xs text-slate-400">— {lec.subjectName || lec.subject?.subjectName}</span>
-                          <span className="px-2 py-0.5 rounded text-[10px] bg-red-900/40 text-red-300 font-bold border border-red-800/40">
-                            MISSED ON {lec.date}
-                          </span>
-                        </div>
-                        <div className="text-xs text-slate-400 mt-1">
-                          Original Slot: {lec.dayOfWeek} {lec.startTime}–{lec.endTime} | Faculty: {lec.faculty?.fullName || lec.faculty?.name} | Room: {lec.room}
-                        </div>
+                          ))
+                        ) : (
+                          <span className="text-[10px] text-slate-500 italic">No subjects assigned</span>
+                        )}
                       </div>
-
-                      <button
-                        onClick={() => {
-                          setSelectedLectureForReschedule(lec);
-                          setManualRescheduleData({
-                            newDate: new Date().toISOString().split('T')[0],
-                            newStartTime: lec.startTime || '14:00',
-                            newEndTime: lec.endTime || '15:00',
-                            newRoom: lec.room || 'Room 201',
-                            reason: 'Manual adjustment after holiday conflict',
-                          });
-                        }}
-                        className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition-all shadow"
-                      >
-                        Reschedule Now
-                      </button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
           </div>
-        )}
-
-        {/* ─── MODAL: ADD TIMETABLE SLOT ─────────────────────────────────────── */}
-        {showAddSlot && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-                <h3 className="text-lg font-bold text-white">Add Weekly Timetable Slot</h3>
-                <button onClick={() => setShowAddSlot(false)} className="text-slate-400 hover:text-white" aria-label="Close">
-                  <X size={18} aria-hidden="true" />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreateSlot} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Day of Week *</label>
-                    <select
-                      value={newSlot.dayOfWeek}
-                      onChange={(e) => setNewSlot({ ...newSlot, dayOfWeek: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                    >
-                      {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Lecture Type</label>
-                    <select
-                      value={newSlot.lectureType}
-                      onChange={(e) => setNewSlot({ ...newSlot, lectureType: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                    >
-                      <option value="theory">Theory</option>
-                      <option value="practical">Practical</option>
-                      <option value="tutorial">Tutorial</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Subject *</label>
-                  <select
-                    value={newSlot.subject}
-                    onChange={(e) => setNewSlot({ ...newSlot, subject: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                    required
-                  >
-                    <option value="">Select subject</option>
-                    {subjects.map((s) => (
-                      <option key={s._id} value={s._id}>
-                        {s.subjectCode} — {s.subjectName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Faculty Member *</label>
-                  <select
-                    value={newSlot.faculty}
-                    onChange={(e) => setNewSlot({ ...newSlot, faculty: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                    required
-                  >
-                    <option value="">Select faculty</option>
-                    {facultyList.map((f) => (
-                      <option key={f._id} value={f._id}>
-                        {f.fullName} — {f.designation}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Start Time (HH:mm) *</label>
-                    <input
-                      type="time"
-                      value={newSlot.startTime}
-                      onChange={(e) => setNewSlot({ ...newSlot, startTime: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">End Time (HH:mm) *</label>
-                    <input
-                      type="time"
-                      value={newSlot.endTime}
-                      onChange={(e) => setNewSlot({ ...newSlot, endTime: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Room / Lab</label>
-                  <input
-                    type="text"
-                    value={newSlot.room}
-                    onChange={(e) => setNewSlot({ ...newSlot, room: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                    placeholder="e.g. Lab 3, Room 204"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddSlot(false)}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={savingSlot}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-lg shadow flex items-center gap-2"
-                  >
-                    {savingSlot ? 'Checking Conflicts...' : 'Save Slot'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ─── MODAL: DECLARE HOLIDAY ─────────────────────────────────────────── */}
-        {showAddHoliday && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-                <h3 className="text-lg font-bold text-white">Declare Academic Holiday</h3>
-                <button onClick={() => setShowAddHoliday(false)} className="text-slate-400 hover:text-white" aria-label="Close">
-                  <X size={18} aria-hidden="true" />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreateHoliday} className="space-y-4">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Holiday Date *</label>
-                  <input
-                    type="date"
-                    value={newHoliday.date}
-                    onChange={(e) => setNewHoliday({ ...newHoliday, date: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Title / Reason *</label>
-                  <input
-                    type="text"
-                    value={newHoliday.title}
-                    onChange={(e) => setNewHoliday({ ...newHoliday, title: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                    placeholder="e.g. Ganesh Chaturthi, Independence Day"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Category</label>
-                  <select
-                    value={newHoliday.type}
-                    onChange={(e) => setNewHoliday({ ...newHoliday, type: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                  >
-                    <option value="national">National Holiday</option>
-                    <option value="state">State Holiday</option>
-                    <option value="institutional">Institutional Holiday</option>
-                    <option value="emergency">Emergency / Weather Closure</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddHoliday(false)}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={savingHoliday}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-lg shadow"
-                  >
-                    {savingHoliday ? 'Applying Shift Logic...' : 'Declare & Shift'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ─── MODAL: MANUAL RESCHEDULE ──────────────────────────────────────── */}
-        {selectedLectureForReschedule && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-                <div>
-                  <h3 className="text-lg font-bold text-white">Manual Lecture Reschedule</h3>
-                  <div className="text-xs text-slate-400 mt-0.5">
-                    {selectedLectureForReschedule.subjectCode} — {selectedLectureForReschedule.subjectName}
-                  </div>
-                </div>
-                <button onClick={() => setSelectedLectureForReschedule(null)} className="text-slate-400 hover:text-white" aria-label="Close">
-                  <X size={18} aria-hidden="true" />
-                </button>
-              </div>
-
-              <form onSubmit={handleManualReschedule} className="space-y-4">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">New Target Date *</label>
-                  <input
-                    type="date"
-                    value={manualRescheduleData.newDate}
-                    onChange={(e) => setManualRescheduleData({ ...manualRescheduleData, newDate: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">New Start Time (HH:mm) *</label>
-                    <input
-                      type="time"
-                      value={manualRescheduleData.newStartTime}
-                      onChange={(e) => setManualRescheduleData({ ...manualRescheduleData, newStartTime: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">New End Time (HH:mm) *</label>
-                    <input
-                      type="time"
-                      value={manualRescheduleData.newEndTime}
-                      onChange={(e) => setManualRescheduleData({ ...manualRescheduleData, newEndTime: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Room / Lab</label>
-                  <input
-                    type="text"
-                    value={manualRescheduleData.newRoom}
-                    onChange={(e) => setManualRescheduleData({ ...manualRescheduleData, newRoom: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Adjustment Reason</label>
-                  <input
-                    type="text"
-                    value={manualRescheduleData.reason}
-                    onChange={(e) => setManualRescheduleData({ ...manualRescheduleData, reason: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedLectureForReschedule(null)}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={rescheduling}
-                    className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold rounded-lg shadow"
-                  >
-                    {rescheduling ? 'Rescheduling...' : 'Confirm Reschedule'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </FacultyLayout>
   );

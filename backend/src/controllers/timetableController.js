@@ -4,7 +4,7 @@
  * HTTP handlers for /api/timetable endpoints.
  */
 
-const schedulerService = require('../services/scheduler/schedulerService');
+const timetableService = require('../services/timetable/timetableService');
 const Faculty = require('../models/Faculty');
 
 /**
@@ -15,7 +15,7 @@ const getTimetable = async (req, res) => {
   try {
     // If student, resolve based on student's own class
     if (req.user.role === 'student') {
-      const data = await schedulerService.getStudentTimetable(req.user.id);
+      const data = await timetableService.getStudentTimetable(req.user.id);
       return res.json({ success: true, data });
     }
 
@@ -33,7 +33,7 @@ const getTimetable = async (req, res) => {
       if (faculty) filters.faculty = faculty._id;
     }
 
-    const data = await schedulerService.getWeeklyTimetable(filters);
+    const data = await timetableService.getWeeklyTimetable(filters);
     res.json({ success: true, data });
   } catch (err) {
     console.error('[Timetable] Get error:', err.message);
@@ -47,7 +47,7 @@ const getTimetable = async (req, res) => {
  */
 const createSlot = async (req, res) => {
   try {
-    const slot = await schedulerService.createTimetableSlot(req.body);
+    const slot = await timetableService.createTimetableSlot(req.body);
     res.status(201).json({ success: true, message: 'Timetable slot created successfully', data: slot });
   } catch (err) {
     console.error('[Timetable] Create error:', err.message);
@@ -65,7 +65,7 @@ const createSlot = async (req, res) => {
  */
 const updateSlot = async (req, res) => {
   try {
-    const slot = await schedulerService.updateTimetableSlot(req.params.id, req.body);
+    const slot = await timetableService.updateTimetableSlot(req.params.id, req.body);
     res.json({ success: true, message: 'Timetable slot updated successfully', data: slot });
   } catch (err) {
     console.error('[Timetable] Update error:', err.message);
@@ -83,11 +83,25 @@ const updateSlot = async (req, res) => {
  */
 const deleteSlot = async (req, res) => {
   try {
-    const result = await schedulerService.deleteTimetableSlot(req.params.id);
+    const result = await timetableService.deleteTimetableSlot(req.params.id);
     res.json({ success: true, message: result.message });
   } catch (err) {
     console.error('[Timetable] Delete error:', err.message);
     res.status(err.statusCode || 500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/timetable/faculty-assignments
+ * Retrieves dynamic mapping of subjectCode -> assigned faculty.
+ */
+const getFacultyAssignments = async (req, res) => {
+  try {
+    const data = await timetableService.getFacultySubjectAssignments();
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('[Timetable] Get faculty assignments error:', err.message);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
@@ -96,4 +110,5 @@ module.exports = {
   createSlot,
   updateSlot,
   deleteSlot,
+  getFacultyAssignments,
 };

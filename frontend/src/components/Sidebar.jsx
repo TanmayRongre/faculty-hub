@@ -72,7 +72,7 @@ const Sidebar = ({ activePath, isOpen, onClose }) => {
     { to: '/faculty/subjects', label: 'Subjects' },
     { to: '/faculty/marks', label: 'Marks Management' },
     { to: '/faculty/attendance', label: 'Fast Attendance' },
-    { to: '/faculty/timetable', label: 'Smart Scheduler' },
+    { to: '/faculty/timetable', label: 'Timetable' },
     { to: '/faculty/notices', label: 'Notice Board' },
   ];
 

@@ -20,7 +20,6 @@ const connectDB = require('../config/db');
 const Student = require('../models/Student');
 const Subject = require('../models/Subject');
 const TimetableSlot = require('../models/TimetableSlot');
-const Lecture = require('../models/Lecture');
 
 const sheetsService = require('../integrations/googleSheets/googleSheetsService');
 const academicDataService = require('../integrations/googleSheets/academicDataService');
