@@ -56,7 +56,7 @@ const FacultyDashboard = () => {
   const [adminStats, setAdminStats] = useState({
     totalFaculty: 0,
     activeFaculty: 0,
-    totalSubjects: 5,
+    totalSubjects: ACADEMIC_CONFIG.SUBJECTS?.length || 6,
   });
 
   const loadDashboardData = async () => {
@@ -78,7 +78,7 @@ const FacultyDashboard = () => {
         setAdminStats({
           totalFaculty: facList.length,
           activeFaculty: activeFac,
-          totalSubjects: subs.length || 5,
+          totalSubjects: subs.length || ACADEMIC_CONFIG.SUBJECTS?.length || 6,
         });
         setTasks(tasksRes.data || []);
         setTaskSummary(summaryRes.data || null);
