@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   CalendarDays,
   Clock,
@@ -22,6 +22,11 @@ import { ACADEMIC_CONFIG } from '../../config/academic';
 import { facultyService } from '../../services/managementService';
 import { getFacultyAssignments } from '../../services/timetableService';
 import { substitutionService } from '../../services/substitutionService';
+import {
+  formatLocalDate,
+  addDaysToDateString,
+  getDayNameFromDateString,
+} from '../../utils/timetableSchedule';
 
 // ─── TIMETABLE DATA DEFINITIONS ──────────────────────────────────────────────
 // Subjects and rooms are fixed according to Semester V CE official curriculum.
@@ -323,14 +328,13 @@ const TimetableCell = ({ item, assignedFacultyName, substitution }) => {
 // ─── MAIN TIMETABLE PAGE COMPONENT ───────────────────────────────────────────
 
 const FacultyTimetablePage = () => {
-  // Calendar Date State (defaults to today)
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  // Calendar Date State (defaults to today in local time)
+  const [selectedDate, setSelectedDate] = useState(() => formatLocalDate());
 
-  // Derived day of week for selected date
-  const selectedDateObj = new Date(selectedDate + 'T00:00:00');
-  const daysList = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const selectedDayName = daysList[selectedDateObj.getDay()];
-  const currentDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  // Derived day of week for selected date (timezone-safe)
+  const selectedDayName = useMemo(() => getDayNameFromDateString(selectedDate), [selectedDate]);
+  const currentDayName = useMemo(() => getDayNameFromDateString(formatLocalDate()), []);
+  const isWeekend = selectedDayName === 'Saturday' || selectedDayName === 'Sunday';
 
   // Dynamic faculty assignments loaded from database (Admin Panel -> Faculty Management)
   const [facultyAssignments, setFacultyAssignments] = useState({});
@@ -376,19 +380,17 @@ const FacultyTimetablePage = () => {
     loadDateSubstitutions();
   }, [loadDateSubstitutions]);
 
-  // Date Navigation Handlers
+  // Date Navigation Handlers (timezone-safe)
   const handleDateChange = (newDateStr) => {
     if (newDateStr) setSelectedDate(newDateStr);
   };
 
   const handleStepDay = (delta) => {
-    const d = new Date(selectedDate + 'T00:00:00');
-    d.setDate(d.getDate() + delta);
-    setSelectedDate(d.toISOString().split('T')[0]);
+    setSelectedDate((prev) => addDaysToDateString(prev, delta));
   };
 
   const handleSetToday = () => {
-    setSelectedDate(new Date().toISOString().split('T')[0]);
+    setSelectedDate(formatLocalDate());
   };
 
   /**
@@ -464,7 +466,7 @@ const FacultyTimetablePage = () => {
 
         {/* 2. Date-Specific Schedule Toolbar */}
         <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => handleStepDay(-1)}
               className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
@@ -496,13 +498,35 @@ const FacultyTimetablePage = () => {
             >
               Today
             </button>
+
+            {isWeekend && (
+              <button
+                onClick={() => {
+                  const daysToAdd = selectedDayName === 'Saturday' ? 2 : 1;
+                  handleStepDay(daysToAdd);
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-purple-950/70 hover:bg-purple-900 border border-purple-800/70 text-purple-300 text-xs font-semibold transition-colors flex items-center gap-1"
+                title="Advance to next instructional day (Monday)"
+              >
+                <span>Jump to Monday</span>
+                <ChevronRight size={13} aria-hidden="true" />
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-3 text-xs w-full sm:w-auto justify-between sm:justify-end">
-            <span className="text-slate-400">
-              Viewing: <strong className="text-white">{selectedDayName}</strong>,{' '}
-              <span className="font-mono text-slate-300">{selectedDate}</span>
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-400">Viewing:</span>
+              <strong className={isWeekend ? 'text-amber-300' : 'text-white'}>
+                {selectedDayName}
+              </strong>
+              <span className="font-mono text-slate-300">({selectedDate})</span>
+              {isWeekend && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-950/80 border border-amber-800/80 text-amber-300">
+                  Weekend
+                </span>
+              )}
+            </div>
 
             {dateSubstitutions.length > 0 && (
               <span className="px-2.5 py-1 rounded-full bg-purple-950/80 text-purple-300 border border-purple-700/60 font-bold text-[11px] flex items-center gap-1.5">

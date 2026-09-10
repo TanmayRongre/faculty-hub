@@ -251,3 +251,38 @@ export function getTeachableSessionsForDay(dayName) {
 
   return sessions;
 }
+
+export const WEEK_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/**
+ * Format Date object to local 'YYYY-MM-DD' without UTC conversion offset bugs
+ */
+export function formatLocalDate(dateObj = new Date()) {
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Step day-by-day from a 'YYYY-MM-DD' string safely in local time
+ */
+export function addDaysToDateString(dateStr, delta) {
+  if (!dateStr || !dateStr.includes('-')) {
+    return formatLocalDate();
+  }
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  d.setDate(d.getDate() + delta);
+  return formatLocalDate(d);
+}
+
+/**
+ * Returns clean weekday name ('Monday', 'Tuesday', etc.) for 'YYYY-MM-DD'
+ */
+export function getDayNameFromDateString(dateStr) {
+  if (!dateStr || !dateStr.includes('-')) return '';
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  return WEEK_DAYS[d.getDay()] || '';
+}

@@ -30,6 +30,8 @@ import { substitutionService } from '../../services/substitutionService';
 import {
   getTeachableSessionsForDay,
   SUBJECT_THEMES,
+  formatLocalDate,
+  getDayNameFromDateString,
 } from '../../utils/timetableSchedule';
 
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -53,7 +55,7 @@ const LeaveSubstitutionPage = () => {
     const day = today.getDay();
     if (day === 6) today.setDate(today.getDate() + 2);
     else if (day === 0) today.setDate(today.getDate() + 1);
-    return today.toISOString().split('T')[0];
+    return formatLocalDate(today);
   });
   const [reason, setReason] = useState('');
   const [selectedSessionIds, setSelectedSessionIds] = useState([]);
@@ -76,12 +78,8 @@ const LeaveSubstitutionPage = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Determine Day name of selected leaveDate
-  const leaveDayName = useMemo(() => {
-    if (!leaveDate) return '';
-    const dateObj = new Date(leaveDate + 'T00:00:00');
-    return DAYS_OF_WEEK[dateObj.getDay()];
-  }, [leaveDate]);
+  // Determine Day name of selected leaveDate (timezone-safe)
+  const leaveDayName = useMemo(() => getDayNameFromDateString(leaveDate), [leaveDate]);
 
   const isWeekend = leaveDayName === 'Saturday' || leaveDayName === 'Sunday';
 
