@@ -79,6 +79,34 @@ const authorizeSubjectAccess = (paramName = 'subjectCode') => {
 
       // 7. Verify if the requested subject is assigned
       if (!assignedCodes.includes(requestedSubject)) {
+        // Check if faculty has an accepted substitution for this specific date and session
+        const rawDate = req.query?.date || req.body?.date;
+        const rawBatch = req.query?.batch || req.body?.batch;
+
+        if (rawDate) {
+          const SubstitutionRequest = require('../models/SubstitutionRequest');
+          const subQuery = {
+            substituteFacultyId: faculty._id,
+            subjectCode: requestedSubject,
+            date: String(rawDate).trim(),
+            status: 'accepted',
+          };
+
+          if (rawBatch) {
+            subQuery.$or = [
+              { batch: String(rawBatch).toUpperCase().trim() },
+              { batch: null },
+            ];
+          }
+
+          const activeSub = await SubstitutionRequest.findOne(subQuery);
+          if (activeSub) {
+            req.isSubstituteSession = true;
+            req.activeSubstitution = activeSub;
+            return next();
+          }
+        }
+
         return res.status(403).json({
           success: false,
           message: `Access denied: You are not assigned to subject "${requestedSubject}". Only assigned subjects: ${assignedCodes.join(', ') || 'None'}`,

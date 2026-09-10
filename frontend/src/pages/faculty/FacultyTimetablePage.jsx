@@ -11,6 +11,9 @@ import {
   Info,
   ExternalLink,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  UserCheck,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import FacultyLayout from './FacultyLayout';
@@ -18,10 +21,12 @@ import { INSTITUTION } from '../../config/institution';
 import { ACADEMIC_CONFIG } from '../../config/academic';
 import { facultyService } from '../../services/managementService';
 import { getFacultyAssignments } from '../../services/timetableService';
+import { substitutionService } from '../../services/substitutionService';
 
 // ─── TIMETABLE DATA DEFINITIONS ──────────────────────────────────────────────
 // Subjects and rooms are fixed according to Semester V CE official curriculum.
 // Faculty names are dynamically resolved from Admin Panel -> Faculty Management.
+// Accepted substitutions dynamically override faculty on that specific date.
 
 const MORNING_SLOTS = ['10:30–11:30', '11:30–12:30', '12:30–1:30'];
 
@@ -29,40 +34,40 @@ const MORNING_SCHEDULE = [
   {
     day: 'Monday',
     slots: [
-      { subject: 'STE', room: '109' },
-      { subject: 'OSY', room: '109' },
-      { subject: 'ACN', room: '109' },
+      { subject: 'STE', room: '109', startTime: '10:30', endTime: '11:30' },
+      { subject: 'OSY', room: '109', startTime: '11:30', endTime: '12:30' },
+      { subject: 'ACN', room: '109', startTime: '12:30', endTime: '13:30' },
     ],
   },
   {
     day: 'Tuesday',
     slots: [
-      { subject: 'ACN', room: '109' },
-      { subject: 'OSY', room: '109' },
-      { subject: 'STE', room: '109' },
+      { subject: 'ACN', room: '109', startTime: '10:30', endTime: '11:30' },
+      { subject: 'OSY', room: '109', startTime: '11:30', endTime: '12:30' },
+      { subject: 'STE', room: '109', startTime: '12:30', endTime: '13:30' },
     ],
   },
   {
     day: 'Wednesday',
     slots: [
-      { subject: 'OSY', room: '109' },
-      { subject: 'ACN', room: '109' },
-      { subject: 'STE', room: '109' },
+      { subject: 'OSY', room: '109', startTime: '10:30', endTime: '11:30' },
+      { subject: 'ACN', room: '109', startTime: '11:30', endTime: '12:30' },
+      { subject: 'STE', room: '109', startTime: '12:30', endTime: '13:30' },
     ],
   },
   {
     day: 'Thursday',
     slots: [
-      { subject: 'OSY', room: '109' },
-      { subject: 'STE', room: '109' },
-      { subject: 'ENDS', room: '109' },
+      { subject: 'OSY', room: '109', startTime: '10:30', endTime: '11:30' },
+      { subject: 'STE', room: '109', startTime: '11:30', endTime: '12:30' },
+      { subject: 'ENDS', room: '109', startTime: '12:30', endTime: '13:30' },
     ],
   },
   {
     day: 'Friday',
     slots: [
-      { subject: 'ACN', room: '109' },
-      { subject: 'OSY', room: '109' },
+      { subject: 'ACN', room: '109', startTime: '10:30', endTime: '11:30' },
+      { subject: 'OSY', room: '109', startTime: '11:30', endTime: '12:30' },
       { isOff: true },
     ],
   },
@@ -74,14 +79,18 @@ const AFTERNOON_SCHEDULE = [
     rows: [
       {
         time: '1:50–2:50',
-        batchA: { subject: 'OSY', room: 'CL5' },
-        batchB: { subject: 'STE', room: 'CL7' },
-        batchC: { subject: 'ENDS', room: '109' },
+        startTime: '13:50',
+        endTime: '14:50',
+        batchA: { subject: 'OSY', room: 'CL5', batch: 'A', startTime: '13:50', endTime: '14:50' },
+        batchB: { subject: 'STE', room: 'CL7', batch: 'B', startTime: '13:50', endTime: '14:50' },
+        batchC: { subject: 'ENDS', room: '109', batch: 'C', startTime: '13:50', endTime: '14:50' },
       },
       {
         time: '2:50–3:50',
-        batchA: { subject: 'STE', room: 'CL7' },
-        batchB: { subject: 'ACN', room: 'CL5' },
+        startTime: '14:50',
+        endTime: '15:50',
+        batchA: { subject: 'STE', room: 'CL7', batch: 'A', startTime: '14:50', endTime: '15:50' },
+        batchB: { subject: 'ACN', room: 'CL5', batch: 'B', startTime: '14:50', endTime: '15:50' },
         batchC: { type: 'library', label: 'Library Time' },
       },
     ],
@@ -91,12 +100,16 @@ const AFTERNOON_SCHEDULE = [
     rows: [
       {
         time: '1:50–2:50',
-        batchA: { subject: 'ACN', room: 'CL5' },
+        startTime: '13:50',
+        endTime: '14:50',
+        batchA: { subject: 'ACN', room: 'CL5', batch: 'A', startTime: '13:50', endTime: '14:50' },
         batchB: { type: 'library', label: 'Library Time' },
-        batchC: { subject: 'STE', room: 'CL6' },
+        batchC: { subject: 'STE', room: 'CL6', batch: 'C', startTime: '13:50', endTime: '14:50' },
       },
       {
         time: '4:00–5:00',
+        startTime: '16:00',
+        endTime: '17:00',
         isCommon: true,
         type: 'sports',
         label: 'Cocurricular Activities / Sports Time',
@@ -108,12 +121,16 @@ const AFTERNOON_SCHEDULE = [
     rows: [
       {
         time: '1:50–2:50',
-        batchA: { subject: 'STE', room: 'CL6' },
-        batchB: { subject: 'ENDS', room: '109' },
-        batchC: { subject: 'OSY', room: 'CL5' },
+        startTime: '13:50',
+        endTime: '14:50',
+        batchA: { subject: 'STE', room: 'CL6', batch: 'A', startTime: '13:50', endTime: '14:50' },
+        batchB: { subject: 'ENDS', room: '109', batch: 'B', startTime: '13:50', endTime: '14:50' },
+        batchC: { subject: 'OSY', room: 'CL5', batch: 'C', startTime: '13:50', endTime: '14:50' },
       },
       {
         time: '4:00–5:00',
+        startTime: '16:00',
+        endTime: '17:00',
         isCommon: true,
         type: 'sports',
         label: 'Cocurricular Activities / Sports Time',
@@ -125,15 +142,19 @@ const AFTERNOON_SCHEDULE = [
     rows: [
       {
         time: '1:50–2:50',
+        startTime: '13:50',
+        endTime: '14:50',
         batchA: { type: 'library', label: 'Library Time' },
-        batchB: { subject: 'OSY', room: 'CL5' },
-        batchC: { subject: 'STE', room: 'CL7' },
+        batchB: { subject: 'OSY', room: 'CL5', batch: 'B', startTime: '13:50', endTime: '14:50' },
+        batchC: { subject: 'STE', room: 'CL7', batch: 'C', startTime: '13:50', endTime: '14:50' },
       },
       {
         time: '4:00–5:00',
-        batchA: { subject: 'SPI', room: 'CL1' },
-        batchB: { subject: 'SPI', room: 'CL5' },
-        batchC: { subject: 'SPI', room: 'CL7' },
+        startTime: '16:00',
+        endTime: '17:00',
+        batchA: { subject: 'SPI', room: 'CL1', batch: 'A', startTime: '16:00', endTime: '17:00' },
+        batchB: { subject: 'SPI', room: 'CL5', batch: 'B', startTime: '16:00', endTime: '17:00' },
+        batchC: { subject: 'SPI', room: 'CL7', batch: 'C', startTime: '16:00', endTime: '17:00' },
       },
     ],
   },
@@ -142,9 +163,11 @@ const AFTERNOON_SCHEDULE = [
     rows: [
       {
         time: '1:50–2:50',
-        batchA: { subject: 'ENDS', room: '109' },
-        batchB: { subject: 'STE', room: 'CL7' },
-        batchC: { subject: 'ACN', room: 'CL5' },
+        startTime: '13:50',
+        endTime: '14:50',
+        batchA: { subject: 'ENDS', room: '109', batch: 'A', startTime: '13:50', endTime: '14:50' },
+        batchB: { subject: 'STE', room: 'CL7', batch: 'B', startTime: '13:50', endTime: '14:50' },
+        batchC: { subject: 'ACN', room: 'CL5', batch: 'C', startTime: '13:50', endTime: '14:50' },
       },
     ],
   },
@@ -199,7 +222,7 @@ const LEGEND_ITEMS = [
 
 // ─── DYNAMIC TIMETABLE CELL RENDERER ─────────────────────────────────────────
 
-const TimetableCell = ({ item, assignedFacultyName }) => {
+const TimetableCell = ({ item, assignedFacultyName, substitution }) => {
   if (!item) return null;
 
   if (item.isOff) {
@@ -236,15 +259,28 @@ const TimetableCell = ({ item, assignedFacultyName }) => {
     roomText: 'text-slate-300',
   };
 
+  const isSubstituted = Boolean(substitution);
+
   return (
     <div
-      className={`${theme.bg} border ${theme.border} rounded-lg p-2.5 flex flex-col justify-between min-h-[76px] hover:border-slate-500 transition-colors shadow-xs`}
+      className={`${
+        isSubstituted
+          ? 'bg-purple-950/30 border-purple-600/70 shadow-purple-950/30 ring-1 ring-purple-500/40'
+          : `${theme.bg} ${theme.border}`
+      } border rounded-lg p-2.5 flex flex-col justify-between min-h-[82px] hover:border-slate-500 transition-all shadow-xs`}
     >
-      {/* Top: Subject code & Room */}
+      {/* Top: Subject code, Room, and Substitution indicator */}
       <div className="flex items-center justify-between gap-1 mb-1.5">
-        <span className={`font-bold text-sm tracking-wide ${theme.text}`}>
-          {item.subject}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`font-bold text-sm tracking-wide ${theme.text}`}>
+            {item.subject}
+          </span>
+          {isSubstituted && (
+            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-900/90 text-purple-200 border border-purple-600/70 tracking-tight">
+              Substitution
+            </span>
+          )}
+        </div>
         <span
           className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border border-slate-700/60 ${theme.badgeBg} ${theme.roomText}`}
         >
@@ -252,20 +288,34 @@ const TimetableCell = ({ item, assignedFacultyName }) => {
         </span>
       </div>
 
-      {/* Bottom: Dynamically assigned faculty */}
-      <div className="flex items-center gap-1.5 text-xs">
-        <UserRound size={11} className="text-slate-400 shrink-0" aria-hidden="true" />
-        <span className="text-slate-400 text-[11px]">Faculty:</span>
-        {assignedFacultyName ? (
-          <span className="text-white font-medium truncate" title={assignedFacultyName}>
-            {assignedFacultyName}
-          </span>
-        ) : (
-          <span className="text-amber-400/90 font-medium italic text-[11px]">
-            Not Assigned
-          </span>
-        )}
-      </div>
+      {/* Bottom: Faculty Display (Substitute vs Normal) */}
+      {isSubstituted ? (
+        <div className="space-y-0.5 text-xs">
+          <div className="flex items-center gap-1 text-purple-200 font-semibold truncate">
+            <UserRound size={11} className="text-purple-400 shrink-0" aria-hidden="true" />
+            <span className="truncate">
+              {substitution.substituteFacultyId?.fullName || 'Substitute Faculty'}
+            </span>
+          </div>
+          <div className="text-[10px] text-slate-400 truncate pl-4">
+            Substitute for {substitution.applicantId?.fullName || assignedFacultyName || 'Faculty'}
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 text-xs">
+          <UserRound size={11} className="text-slate-400 shrink-0" aria-hidden="true" />
+          <span className="text-slate-400 text-[11px]">Faculty:</span>
+          {assignedFacultyName ? (
+            <span className="text-white font-medium truncate" title={assignedFacultyName}>
+              {assignedFacultyName}
+            </span>
+          ) : (
+            <span className="text-amber-400/90 font-medium italic text-[11px]">
+              Not Assigned
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -273,14 +323,22 @@ const TimetableCell = ({ item, assignedFacultyName }) => {
 // ─── MAIN TIMETABLE PAGE COMPONENT ───────────────────────────────────────────
 
 const FacultyTimetablePage = () => {
-  // Current Day of Week Detection
+  // Calendar Date State (defaults to today)
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+
+  // Derived day of week for selected date
+  const selectedDateObj = new Date(selectedDate + 'T00:00:00');
+  const daysList = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const selectedDayName = daysList[selectedDateObj.getDay()];
   const currentDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
 
   // Dynamic faculty assignments loaded from database (Admin Panel -> Faculty Management)
   const [facultyAssignments, setFacultyAssignments] = useState({});
   const [facultyList, setFacultyList] = useState([]);
+  const [dateSubstitutions, setDateSubstitutions] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Load permanent faculty assignments
   const loadAssignments = useCallback(async () => {
     setLoading(true);
     try {
@@ -298,26 +356,53 @@ const FacultyTimetablePage = () => {
     }
   }, []);
 
+  // Load accepted substitutions for selected date
+  const loadDateSubstitutions = useCallback(async () => {
+    if (!selectedDate) return;
+    try {
+      const res = await substitutionService.getDateSubstitutions(selectedDate);
+      setDateSubstitutions(res.data || []);
+    } catch (err) {
+      console.error('Failed to load substitutions for date:', err);
+      setDateSubstitutions([]);
+    }
+  }, [selectedDate]);
+
   useEffect(() => {
     loadAssignments();
   }, [loadAssignments]);
 
+  useEffect(() => {
+    loadDateSubstitutions();
+  }, [loadDateSubstitutions]);
+
+  // Date Navigation Handlers
+  const handleDateChange = (newDateStr) => {
+    if (newDateStr) setSelectedDate(newDateStr);
+  };
+
+  const handleStepDay = (delta) => {
+    const d = new Date(selectedDate + 'T00:00:00');
+    d.setDate(d.getDate() + delta);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
+  const handleSetToday = () => {
+    setSelectedDate(new Date().toISOString().split('T')[0]);
+  };
+
   /**
    * Resolves assigned faculty name dynamically for a subject code.
-   * If subject is assigned to a faculty member in database -> returns faculty name.
-   * If not assigned -> returns null (cell renders 'Faculty: Not Assigned').
    */
   const getAssignedFacultyForSubject = (subjectCode) => {
     if (!subjectCode) return null;
     const code = subjectCode.toUpperCase();
 
-    // 1. Check direct dictionary from getFacultyAssignments
     const assignedFromApi = facultyAssignments[code];
     if (assignedFromApi && assignedFromApi.length > 0) {
       return assignedFromApi.map((f) => f.fullName).join(', ');
     }
 
-    // 2. Fallback to facultyList inspection
     const matches = facultyList.filter(
       (f) => f.status !== 'inactive' && f.subjects?.some((s) => s.subjectCode === code)
     );
@@ -326,6 +411,26 @@ const FacultyTimetablePage = () => {
     }
 
     return null;
+  };
+
+  /**
+   * Checks if an accepted substitution is active for a specific session on the selected date.
+   */
+  const getActiveSubstitution = (day, subjectCode, startTime, batch = null) => {
+    if (!dateSubstitutions || dateSubstitutions.length === 0) return null;
+    if (selectedDayName !== day) return null; // Only overrides on that exact date's day of week
+
+    return dateSubstitutions.find((sub) => {
+      if (sub.subjectCode !== subjectCode.toUpperCase()) return false;
+      const cleanSubStart = sub.startTime.replace(':', '');
+      const cleanSlotStart = startTime.replace(':', '').replace('–', '');
+      if (!cleanSlotStart.startsWith(cleanSubStart) && cleanSubStart !== cleanSlotStart) return false;
+
+      if (batch) {
+        return sub.batch === batch.toUpperCase() || sub.batch === null;
+      }
+      return sub.batch === null;
+    });
   };
 
   return (
@@ -357,7 +462,58 @@ const FacultyTimetablePage = () => {
           </div>
         </div>
 
-        {/* 2. Morning / Written Timetable */}
+        {/* 2. Date-Specific Schedule Toolbar */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => handleStepDay(-1)}
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              title="Previous Day"
+              aria-label="Previous Day"
+            >
+              <ChevronLeft size={16} aria-hidden="true" />
+            </button>
+
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+            />
+
+            <button
+              onClick={() => handleStepDay(1)}
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              title="Next Day"
+              aria-label="Next Day"
+            >
+              <ChevronRight size={16} aria-hidden="true" />
+            </button>
+
+            <button
+              onClick={handleSetToday}
+              className="px-3 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-400 text-xs font-bold transition-colors"
+            >
+              Today
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 text-xs w-full sm:w-auto justify-between sm:justify-end">
+            <span className="text-slate-400">
+              Viewing: <strong className="text-white">{selectedDayName}</strong>,{' '}
+              <span className="font-mono text-slate-300">{selectedDate}</span>
+            </span>
+
+            {dateSubstitutions.length > 0 && (
+              <span className="px-2.5 py-1 rounded-full bg-purple-950/80 text-purple-300 border border-purple-700/60 font-bold text-[11px] flex items-center gap-1.5">
+                <UserCheck size={12} aria-hidden="true" />
+                <span>{dateSubstitutions.length} Active Substitution{dateSubstitutions.length > 1 ? 's' : ''}</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* 3. Morning / Written Timetable */}
         <section className="space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
@@ -391,12 +547,13 @@ const FacultyTimetablePage = () => {
               </thead>
               <tbody className="divide-y divide-slate-800 text-sm">
                 {MORNING_SCHEDULE.map((row) => {
+                  const isSelectedDay = row.day === selectedDayName;
                   const isToday = row.day === currentDayName;
                   return (
                     <tr
                       key={row.day}
                       className={`transition-colors ${
-                        isToday
+                        isSelectedDay
                           ? 'bg-blue-950/25 hover:bg-blue-950/35 border-l-4 border-l-blue-500'
                           : 'hover:bg-slate-800/30'
                       }`}
@@ -411,14 +568,21 @@ const FacultyTimetablePage = () => {
                           )}
                         </div>
                       </td>
-                      {row.slots.map((slot, idx) => (
-                        <td key={idx} className="py-2.5 px-3">
-                          <TimetableCell
-                            item={slot}
-                            assignedFacultyName={getAssignedFacultyForSubject(slot.subject)}
-                          />
-                        </td>
-                      ))}
+                      {row.slots.map((slot, idx) => {
+                        const sub = slot.subject
+                          ? getActiveSubstitution(row.day, slot.subject, slot.startTime)
+                          : null;
+
+                        return (
+                          <td key={idx} className="py-2.5 px-3">
+                            <TimetableCell
+                              item={slot}
+                              assignedFacultyName={getAssignedFacultyForSubject(slot.subject)}
+                              substitution={sub}
+                            />
+                          </td>
+                        );
+                      })}
                     </tr>
                   );
                 })}
@@ -427,7 +591,7 @@ const FacultyTimetablePage = () => {
           </div>
         </section>
 
-        {/* 3. Afternoon Practical / Batch Timetable */}
+        {/* 4. Afternoon Practical / Batch Timetable */}
         <section className="space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
@@ -466,12 +630,13 @@ const FacultyTimetablePage = () => {
               </thead>
               <tbody className="divide-y divide-slate-800 text-sm">
                 {AFTERNOON_SCHEDULE.map((dayGroup) => {
+                  const isSelectedDay = dayGroup.day === selectedDayName;
                   const isToday = dayGroup.day === currentDayName;
                   return dayGroup.rows.map((row, rIdx) => (
                     <tr
                       key={`${dayGroup.day}-${rIdx}`}
                       className={`transition-colors ${
-                        isToday
+                        isSelectedDay
                           ? 'bg-purple-950/20 hover:bg-purple-950/30 border-l-4 border-l-purple-500'
                           : 'hover:bg-slate-800/30'
                       }`}
@@ -505,18 +670,33 @@ const FacultyTimetablePage = () => {
                             <TimetableCell
                               item={row.batchA}
                               assignedFacultyName={getAssignedFacultyForSubject(row.batchA?.subject)}
+                              substitution={
+                                row.batchA?.subject
+                                  ? getActiveSubstitution(dayGroup.day, row.batchA.subject, row.startTime, 'A')
+                                  : null
+                              }
                             />
                           </td>
                           <td className="py-2.5 px-3">
                             <TimetableCell
                               item={row.batchB}
                               assignedFacultyName={getAssignedFacultyForSubject(row.batchB?.subject)}
+                              substitution={
+                                row.batchB?.subject
+                                  ? getActiveSubstitution(dayGroup.day, row.batchB.subject, row.startTime, 'B')
+                                  : null
+                              }
                             />
                           </td>
                           <td className="py-2.5 px-3">
                             <TimetableCell
                               item={row.batchC}
                               assignedFacultyName={getAssignedFacultyForSubject(row.batchC?.subject)}
+                              substitution={
+                                row.batchC?.subject
+                                  ? getActiveSubstitution(dayGroup.day, row.batchC.subject, row.startTime, 'C')
+                                  : null
+                              }
                             />
                           </td>
                         </>
@@ -529,20 +709,30 @@ const FacultyTimetablePage = () => {
           </div>
         </section>
 
-        {/* 4. Subject & Dynamic Faculty Reference Card */}
+        {/* 5. Subject & Dynamic Faculty Reference Card */}
         <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4">
-          <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
               <Info size={14} className="text-blue-400" aria-hidden="true" />
               <span>Course Curriculum & Dynamic Faculty Assignments</span>
             </div>
-            <Link
-              to="/faculty/faculty"
-              className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 transition-colors"
-            >
-              <span>Manage in Faculty Management</span>
-              <ExternalLink size={12} aria-hidden="true" />
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                to="/faculty/leave"
+                className="text-xs text-purple-400 hover:text-purple-300 font-semibold flex items-center gap-1 transition-colors"
+              >
+                <span>Leave & Substitutions</span>
+                <ExternalLink size={12} aria-hidden="true" />
+              </Link>
+              <span className="text-slate-700">•</span>
+              <Link
+                to="/faculty/faculty"
+                className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 transition-colors"
+              >
+                <span>Faculty Management</span>
+                <ExternalLink size={12} aria-hidden="true" />
+              </Link>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

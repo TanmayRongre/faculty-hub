@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   BookOpen,
   Beaker,
@@ -52,6 +53,7 @@ const PRACTICAL_TIME_SLOTS = [
 
 const AttendancePage = () => {
   const { user, isAdmin } = useAuth();
+  const [searchParams] = useSearchParams();
 
   // Navigation Steps: 'TYPE' | 'SUBJECT' | 'BATCH' | 'MARKING' | 'HISTORY'
   const [step, setStep] = useState('TYPE');
@@ -93,23 +95,24 @@ const AttendancePage = () => {
       setStep('BATCH');
     } else {
       setSelectedBatch(null);
-      fetchRosterAndProceed('LECTURE', subCode, null);
+      fetchRosterAndProceed('LECTURE', subCode, null, date);
     }
   };
 
   const handleSelectBatch = (batchId) => {
     setSelectedBatch(batchId);
-    fetchRosterAndProceed('PRACTICAL', selectedSubject, batchId);
+    fetchRosterAndProceed('PRACTICAL', selectedSubject, batchId, date);
   };
 
   // Fetch exact student slice for marking
-  const fetchRosterAndProceed = async (type, subCode, batchId) => {
+  const fetchRosterAndProceed = async (type, subCode, batchId, targetDate = date) => {
     setLoadingRoster(true);
     try {
       const res = await getRoster({
         attendanceType: type,
         subjectCode: subCode,
         batch: batchId,
+        date: targetDate,
       });
 
       const students = res.students || [];
@@ -130,6 +133,27 @@ const AttendancePage = () => {
       setLoadingRoster(false);
     }
   };
+
+  // Pre-populate if query parameters exist (e.g. from substitution or timetable quick action)
+  useEffect(() => {
+    const subParam = searchParams.get('subject');
+    const batchParam = searchParams.get('batch');
+    const dateParam = searchParams.get('date');
+
+    if (subParam) {
+      const type = batchParam ? 'PRACTICAL' : 'LECTURE';
+      const effectiveDate = dateParam || date;
+      setAttendanceType(type);
+      setSelectedSubject(subParam);
+      if (dateParam) setDate(dateParam);
+      if (batchParam) {
+        setSelectedBatch(batchParam);
+        fetchRosterAndProceed('PRACTICAL', subParam, batchParam, effectiveDate);
+      } else {
+        fetchRosterAndProceed('LECTURE', subParam, null, effectiveDate);
+      }
+    }
+  }, [searchParams]);
 
   // ─── Status Modification ──────────────────────────────────────────────────
 

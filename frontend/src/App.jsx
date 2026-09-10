@@ -22,6 +22,7 @@ import SheetsStatusPage from './pages/faculty/SheetsStatusPage';
 import MarksManagementPage from './pages/faculty/MarksManagementPage';
 import AttendancePage from './pages/faculty/AttendancePage';
 import FacultyTimetablePage from './pages/faculty/FacultyTimetablePage';
+import LeaveSubstitutionPage from './pages/faculty/LeaveSubstitutionPage';
 import FacultyNoticesPage from './pages/faculty/FacultyNoticesPage';
 import TaskManagementPage from './pages/faculty/TaskManagementPage';
 
@@ -196,6 +197,16 @@ const App = () => {
             element={
               <ProtectedRoute roles={['faculty', 'admin']}>
                 <FacultyTimetablePage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Faculty Leave & Substitution — Faculty + Admin */}
+          <Route
+            path="/faculty/leave"
+            element={
+              <ProtectedRoute roles={['faculty', 'admin']}>
+                <LeaveSubstitutionPage />
               </ProtectedRoute>
             }
           />

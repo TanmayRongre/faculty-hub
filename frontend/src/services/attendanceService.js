@@ -16,9 +16,10 @@ import api from './api';
  * - Practical B: 23 students (25–47)
  * - Practical C: 21 students (48–68)
  */
-export async function getRoster({ attendanceType, subjectCode, batch = null }) {
+export async function getRoster({ attendanceType, subjectCode, batch = null, date = null }) {
   const params = { attendanceType, subjectCode };
   if (batch) params.batch = batch;
+  if (date) params.date = date;
   const res = await api.get('/attendance/roster', { params });
   return res.data;
 }

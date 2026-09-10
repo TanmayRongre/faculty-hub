@@ -20,6 +20,7 @@ import {
   ChevronRight,
   FileSpreadsheet,
   Plus,
+  UserCheck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { INSTITUTION } from '../../config/institution';
@@ -160,6 +161,7 @@ const FacultyDashboard = () => {
     { label: 'Attendance', desc: 'Fast lecture attendance tracking', to: '/faculty/attendance', icon: CalendarCheck2 },
     { label: 'Marks Engine', desc: 'MSBTE PA1, PA2 & practical records', to: '/faculty/marks', icon: BarChart3 },
     { label: 'Timetable', desc: 'Weekly class timetable', to: '/faculty/timetable', icon: CalendarDays },
+    { label: 'Leave & Substitution', desc: 'Apply for leave & manage substitutions', to: '/faculty/leave', icon: UserCheck },
     { label: 'Academic Structure', desc: 'MSBTE curriculum & subjects', to: '/faculty/academic', icon: Library },
     { label: 'Campus Notices', desc: 'Broadcast circulars & updates', to: '/faculty/notices', icon: Megaphone },
     ...(isAdmin

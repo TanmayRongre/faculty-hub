@@ -14,6 +14,7 @@ import {
   CalendarDays,
   Megaphone,
   CheckSquare,
+  UserCheck,
   LogOut,
   X,
 } from 'lucide-react';
@@ -28,6 +29,7 @@ const NAV_ICONS = {
   '/faculty/marks': BarChart3,
   '/faculty/attendance': CalendarCheck2,
   '/faculty/timetable': CalendarDays,
+  '/faculty/leave': UserCheck,
   '/faculty/notices': Megaphone,
 };
 
@@ -73,6 +75,7 @@ const Sidebar = ({ activePath, isOpen, onClose }) => {
     { to: '/faculty/marks', label: 'Marks Management' },
     { to: '/faculty/attendance', label: 'Fast Attendance' },
     { to: '/faculty/timetable', label: 'Timetable' },
+    { to: '/faculty/leave', label: 'Leave & Substitution' },
     { to: '/faculty/notices', label: 'Notice Board' },
   ];
 
