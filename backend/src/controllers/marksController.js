@@ -114,7 +114,8 @@ async function getStudentMarks(req, res) {
 async function getSubjectMarks(req, res) {
   try {
     const { subjectCode } = req.params;
-    const result = await marksService.getSubjectMarks(subjectCode);
+    const { batch, type } = req.query;
+    const result = await marksService.getSubjectMarks(subjectCode, { batch, type });
     return res.json({ success: true, ...result });
   } catch (err) {
     return handleError(err, res);
@@ -140,11 +141,11 @@ async function getAllMarks(req, res) {
 
 /**
  * PUT /api/marks/batch or PUT /api/marks/bulk
- * Body: { subject: 'STE', marks: [{ rollNo: 1, pa1: 25, pa2: 27 }, ...], academicYear, semester }
+ * Body: { subject: 'STE', marks: [...], type: 'PA'|'PRACTICAL', batch: 'A'|'B'|'C', academicYear, semester }
  */
 async function bulkUpdateMarks(req, res) {
   try {
-    const { subject, subjectCode, marks, academicYear, semester } = req.body;
+    const { subject, subjectCode, marks, type, batch, academicYear, semester } = req.body;
     const sub = subject || subjectCode;
 
     if (!sub) {
@@ -158,6 +159,8 @@ async function bulkUpdateMarks(req, res) {
     const result = await marksService.bulkUpdateMarks({
       subject: sub,
       marks,
+      type,
+      batch,
       academicYear: academicYear || '2026-2027',
       semester: semester || 5,
     });
@@ -166,6 +169,7 @@ async function bulkUpdateMarks(req, res) {
       success: true,
       message: `Successfully saved marks for ${result.processed} students in ${result.subject}`,
       subject: result.subject,
+      type: result.type,
       processed: result.processed,
       results: result.results,
     });

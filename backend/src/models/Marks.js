@@ -48,6 +48,21 @@ const marksSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
+    practicalMarks: {
+      type: Number,
+      default: null,
+      min: [0, 'Practical mark cannot be negative'],
+    },
+    batch: {
+      type: String,
+      enum: ['A', 'B', 'C', null],
+      default: null,
+    },
+    assessmentType: {
+      type: String,
+      enum: ['PA', 'PRACTICAL'],
+      default: 'PA',
+    },
   },
   {
     timestamps: true,

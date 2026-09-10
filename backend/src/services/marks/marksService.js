@@ -17,6 +17,7 @@ const Department = require('../../models/Department');
 const Marks = require('../../models/Marks');
 const academicDataService = require('../../integrations/googleSheets/academicDataService');
 const sheetsService = require('../../integrations/googleSheets/googleSheetsService');
+const { ACADEMIC_CONFIG } = require('../../config/academic');
 const {
   THEORY_SUBJECTS,
   PRACTICAL_SUBJECTS,
@@ -29,6 +30,35 @@ const {
   calculateMarks,
   getPerformanceStatus,
 } = require('./msbteEngine');
+
+const PA_SUBJECTS = ACADEMIC_CONFIG.PA_SUBJECTS || ['STE', 'OSY', 'ACN'];
+const PRACTICAL_MARKS_SUBJECTS = ACADEMIC_CONFIG.PRACTICAL_MARKS_SUBJECTS || ['ENDS', 'SPI', 'ITR'];
+
+function getBatchForRoll(rollNumber) {
+  const r = Number(rollNumber);
+  if (r >= 1 && r <= 24) return 'A';
+  if (r >= 25 && r <= 47) return 'B';
+  if (r >= 48 && r <= 68) return 'C';
+  return null;
+}
+
+function validatePracticalMark(value, fieldName = 'Practical mark') {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const n = Number(value);
+  if (isNaN(n)) {
+    const err = new Error(`${fieldName} must be a valid number, got: "${value}"`);
+    err.statusCode = 422;
+    throw err;
+  }
+  if (n < 0) {
+    const err = new Error(`${fieldName} cannot be negative (got ${n})`);
+    err.statusCode = 422;
+    throw err;
+  }
+  return Math.round(n * 100) / 100;
+}
 
 /**
  * Resolves a Student by MongoDB ObjectId, enrollmentNumber, or rollNumber.
@@ -58,13 +88,29 @@ async function resolveStudent(studentId) {
 
 /**
  * Resolves a subject code → subject document.
+ * Auto-creates ITR if missing in MongoDB.
  * @param {string} subjectCode
  */
 async function resolveSubject(subjectCode) {
   const code = (subjectCode || '').toUpperCase().trim();
-  const subject = await Subject.findOne({ subjectCode: code })
+  let subject = await Subject.findOne({ subjectCode: code })
     .select('subjectCode subjectName semester department')
     .lean();
+
+  if (!subject && code === 'ITR') {
+    const dept = await Department.findOne();
+    if (dept) {
+      const created = await Subject.create({
+        subjectCode: 'ITR',
+        subjectName: 'Industrial Training',
+        courseCode: '315004',
+        department: dept._id,
+        semester: 5,
+      });
+      subject = created.toObject();
+    }
+  }
+
   if (!subject) {
     const err = new Error(`Subject not found: ${subjectCode}`);
     err.statusCode = 404;
@@ -74,50 +120,33 @@ async function resolveSubject(subjectCode) {
 }
 
 /**
- * Get marks for all 68 students for a given subject.
- * Returns students in exact numerical roll order (1 -> 68).
+ * Get marks for a given subject.
+ * - PA: Returns all 68 active students in numerical roll order (1 -> 68).
+ * - Practical: Returns students for the requested batch (A: 1-24, B: 25-47, C: 48-68).
  *
  * @param {string} subjectCode
- * @returns {Promise<{ subject: object, students: Array<object> }>}
+ * @param {object} [options]
+ * @param {string} [options.batch] - 'A' | 'B' | 'C'
+ * @param {string} [options.type] - 'PA' | 'PRACTICAL'
+ * @returns {Promise<{ subjectCode: string, subjectName: string, type: string, students: Array<object> }>}
  */
-async function getSubjectMarks(subjectCode) {
+async function getSubjectMarks(subjectCode, options = {}) {
   const code = (subjectCode || '').toUpperCase().trim();
   const subject = await resolveSubject(code);
 
-  const isTheory = isTheorySubject(code);
-  const hasPractical = hasPracticalAssessment(code);
+  const determinedType = (
+    options.type ||
+    (PRACTICAL_MARKS_SUBJECTS.includes(code) ? 'PRACTICAL' : 'PA')
+  ).toUpperCase().trim();
+
+  const requestedBatch = options.batch ? String(options.batch).toUpperCase().trim() : null;
 
   // 1. Fetch all active 5th semester students in numerical roll order
-  const students = await Student.find({ semester: 5, status: 'active' })
+  let students = await Student.find({ semester: 5, status: 'active' })
     .collation({ locale: 'en', numericOrdering: true })
     .sort({ rollNumber: 1 })
     .select('_id rollNumber enrollmentNumber fullName department semester')
     .lean();
-
-  if (!isTheory) {
-    // Return non-PA subject response (ENDS has practical, SPI does not)
-    return {
-      subjectCode: code,
-      subjectName: subject.subjectName,
-      isTheory: false,
-      hasPractical,
-      practicalAssessment: hasPractical,
-      hasPA: false,
-      message: hasPractical
-        ? `${code} is evaluated via Practical Assessment. Theory PA1/PA2 assessments do not apply.`
-        : `${code} is a Seminar/Project Initiation course without PA1/PA2 assessments.`,
-      students: students.map((s) => ({
-        studentId: s._id,
-        rollNo: s.rollNumber,
-        enrollmentNumber: s.enrollmentNumber,
-        fullName: s.fullName,
-        pa1: null,
-        pa2: null,
-        average: null,
-      })),
-    };
-  }
-
 
   // 2. Fetch existing marks from MongoDB for this subject
   const marksList = await Marks.find({ subjectCode: code }).lean();
@@ -129,7 +158,53 @@ async function getSubjectMarks(subjectCode) {
     }
   }
 
-  // 3. Merge roster with marks
+  // Practical Flow (ENDS, SPI, ITR)
+  if (determinedType === 'PRACTICAL' || PRACTICAL_MARKS_SUBJECTS.includes(code)) {
+    if (requestedBatch) {
+      if (requestedBatch === 'A') {
+        students = students.filter((s) => Number(s.rollNumber) >= 1 && Number(s.rollNumber) <= 24);
+      } else if (requestedBatch === 'B') {
+        students = students.filter((s) => Number(s.rollNumber) >= 25 && Number(s.rollNumber) <= 47);
+      } else if (requestedBatch === 'C') {
+        students = students.filter((s) => Number(s.rollNumber) >= 48 && Number(s.rollNumber) <= 68);
+      }
+    }
+
+    const mergedList = students.map((s) => {
+      const roll = String(s.rollNumber).trim();
+      const existing = marksMap.get(roll) || marksMap.get(String(s._id));
+      const practicalMarks =
+        existing?.practicalMarks !== undefined && existing?.practicalMarks !== null
+          ? existing.practicalMarks
+          : null;
+
+      return {
+        studentId: s._id,
+        rollNo: roll,
+        enrollmentNumber: s.enrollmentNumber,
+        fullName: s.fullName,
+        subjectCode: code,
+        batch: existing?.batch || getBatchForRoll(roll),
+        practicalMarks,
+        pa1: null,
+        pa2: null,
+        average: null,
+        updatedAt: existing?.updatedAt || null,
+      };
+    });
+
+    return {
+      subjectCode: code,
+      subjectName: subject.subjectName,
+      type: 'PRACTICAL',
+      batch: requestedBatch,
+      isTheory: false,
+      totalStudents: mergedList.length,
+      students: mergedList,
+    };
+  }
+
+  // PA Flow (STE, OSY, ACN) - Full Class (68 Students)
   const mergedList = students.map((s) => {
     const roll = String(s.rollNumber).trim();
     const existing = marksMap.get(roll) || marksMap.get(String(s._id));
@@ -155,6 +230,7 @@ async function getSubjectMarks(subjectCode) {
   return {
     subjectCode: code,
     subjectName: subject.subjectName,
+    type: 'PA',
     isTheory: true,
     totalStudents: mergedList.length,
     students: mergedList,
@@ -163,15 +239,25 @@ async function getSubjectMarks(subjectCode) {
 
 /**
  * Bulk updates marks for multiple students in a single atomic request (SAVE ALL).
+ * Handles both PA (pa1, pa2, average) and Practical (practicalMarks, batch).
  *
  * @param {object} payload
- * @param {string} payload.subject - e.g. "STE", "OSY", "ACN"
- * @param {Array<{ rollNo?: string|number, studentId?: string, enrollmentNumber?: string, pa1?: number|string|null, pa2?: number|string|null }>} payload.marks
+ * @param {string} payload.subject - e.g. "STE", "OSY", "ACN", "ENDS", "SPI", "ITR"
+ * @param {string} [payload.type] - "PA" | "PRACTICAL"
+ * @param {string} [payload.batch] - "A" | "B" | "C"
+ * @param {Array<object>} payload.marks
  * @param {string} [payload.academicYear='2026-2027']
  * @param {number} [payload.semester=5]
- * @returns {Promise<{ success: boolean, subject: string, processed: number, results: Array<object> }>}
+ * @returns {Promise<{ success: boolean, subject: string, type: string, processed: number, results: Array<object> }>}
  */
-async function bulkUpdateMarks({ subject, marks, academicYear = '2026-2027', semester = 5 }) {
+async function bulkUpdateMarks({
+  subject,
+  marks,
+  type,
+  batch,
+  academicYear = '2026-2027',
+  semester = 5,
+}) {
   if (!subject) {
     const err = new Error('Subject code is required');
     err.statusCode = 400;
@@ -179,9 +265,22 @@ async function bulkUpdateMarks({ subject, marks, academicYear = '2026-2027', sem
   }
 
   const subCode = subject.toUpperCase().trim();
-  if (!isTheorySubject(subCode)) {
+  const determinedType = (
+    type ||
+    (PRACTICAL_MARKS_SUBJECTS.includes(subCode) ? 'PRACTICAL' : 'PA')
+  ).toUpperCase().trim();
+
+  if (determinedType === 'PA' && !PA_SUBJECTS.includes(subCode)) {
     const err = new Error(
-      `Subject ${subCode} is not a theory subject with PA1/PA2 assessments. Allowed theory subjects: ${THEORY_SUBJECTS.join(', ')}`
+      `Subject ${subCode} is not an applicable PA subject. Allowed PA subjects: ${PA_SUBJECTS.join(', ')}`
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (determinedType === 'PRACTICAL' && !PRACTICAL_MARKS_SUBJECTS.includes(subCode)) {
+    const err = new Error(
+      `Subject ${subCode} is not an applicable Practical subject. Allowed Practical subjects: ${PRACTICAL_MARKS_SUBJECTS.join(', ')}`
     );
     err.statusCode = 400;
     throw err;
@@ -207,14 +306,21 @@ async function bulkUpdateMarks({ subject, marks, academicYear = '2026-2027', sem
     idMap.set(String(s._id), s);
   }
 
-  // 2. Validate all entries strictly before writing anything
+  // 2. Validate all entries
   const validatedRecords = [];
   const errors = [];
 
   for (let i = 0; i < marks.length; i++) {
     const entry = marks[i];
-    const rawRoll = entry.rollNo !== undefined ? String(entry.rollNo).trim() : (entry.rollNumber ? String(entry.rollNumber).trim() : null);
-    const rawEnroll = entry.enrollmentNumber ? String(entry.enrollmentNumber).toUpperCase().trim() : null;
+    const rawRoll =
+      entry.rollNo !== undefined
+        ? String(entry.rollNo).trim()
+        : entry.rollNumber
+        ? String(entry.rollNumber).trim()
+        : null;
+    const rawEnroll = entry.enrollmentNumber
+      ? String(entry.enrollmentNumber).toUpperCase().trim()
+      : null;
     const rawId = entry.studentId ? String(entry.studentId).trim() : null;
 
     let student = null;
@@ -232,84 +338,128 @@ async function bulkUpdateMarks({ subject, marks, academicYear = '2026-2027', sem
     }
 
     try {
-      const pa1 = validatePAMark(entry.pa1 !== undefined ? entry.pa1 : entry.PA1, `Roll ${student.rollNumber} PA1`);
-      const pa2 = validatePAMark(entry.pa2 !== undefined ? entry.pa2 : entry.PA2, `Roll ${student.rollNumber} PA2`);
-      const average = calculateTheoryAverage(pa1, pa2);
+      if (determinedType === 'PRACTICAL') {
+        const rawPractical =
+          entry.practicalMarks !== undefined ? entry.practicalMarks : entry.practicalMark;
+        const practicalMark = validatePracticalMark(
+          rawPractical,
+          `Roll ${student.rollNumber} Practical Mark`
+        );
+        const entryBatch = entry.batch || batch || getBatchForRoll(student.rollNumber);
 
-      validatedRecords.push({
-        studentId: student._id,
-        rollNo: student.rollNumber,
-        enrollmentNumber: student.enrollmentNumber,
-        fullName: student.fullName,
-        department: student.department,
-        subjectId: subjectDoc._id,
-        subjectCode: subCode,
-        semester: Number(semester) || 5,
-        pa1,
-        pa2,
-        average,
-      });
+        validatedRecords.push({
+          studentId: student._id,
+          rollNo: student.rollNumber,
+          enrollmentNumber: student.enrollmentNumber,
+          fullName: student.fullName,
+          department: student.department,
+          subjectId: subjectDoc._id,
+          subjectCode: subCode,
+          semester: Number(semester) || 5,
+          practicalMarks: practicalMark,
+          batch: entryBatch,
+          assessmentType: 'PRACTICAL',
+        });
+      } else {
+        const pa1 = validatePAMark(
+          entry.pa1 !== undefined ? entry.pa1 : entry.PA1,
+          `Roll ${student.rollNumber} PA1`
+        );
+        const pa2 = validatePAMark(
+          entry.pa2 !== undefined ? entry.pa2 : entry.PA2,
+          `Roll ${student.rollNumber} PA2`
+        );
+        const average = calculateTheoryAverage(pa1, pa2);
+
+        validatedRecords.push({
+          studentId: student._id,
+          rollNo: student.rollNumber,
+          enrollmentNumber: student.enrollmentNumber,
+          fullName: student.fullName,
+          department: student.department,
+          subjectId: subjectDoc._id,
+          subjectCode: subCode,
+          semester: Number(semester) || 5,
+          pa1,
+          pa2,
+          average,
+          assessmentType: 'PA',
+        });
+      }
     } catch (valErr) {
       errors.push(valErr.message);
     }
   }
 
   if (errors.length > 0) {
-    const err = new Error(`Validation failed for ${errors.length} record(s): ${errors.slice(0, 5).join('; ')}`);
+    const err = new Error(
+      `Validation failed for ${errors.length} record(s): ${errors.slice(0, 5).join('; ')}`
+    );
     err.statusCode = 422;
     err.details = errors;
     throw err;
   }
 
   // 3. Atomic bulkWrite to MongoDB Marks collection
-  const bulkOps = validatedRecords.map((rec) => ({
-    updateOne: {
-      filter: { studentId: rec.studentId, subjectId: rec.subjectId },
-      update: {
-        $set: {
-          rollNo: rec.rollNo,
-          subjectCode: rec.subjectCode,
-          semester: rec.semester,
-          department: rec.department,
-          pa1: rec.pa1,
-          pa2: rec.pa2,
-          average: rec.average,
-          updatedAt: new Date(),
-        },
+  const bulkOps = validatedRecords.map((rec) => {
+    const updateSet = {
+      rollNo: rec.rollNo,
+      subjectCode: rec.subjectCode,
+      semester: rec.semester,
+      department: rec.department,
+      assessmentType: rec.assessmentType,
+      updatedAt: new Date(),
+    };
+
+    if (determinedType === 'PRACTICAL') {
+      updateSet.practicalMarks = rec.practicalMarks;
+      updateSet.batch = rec.batch;
+    } else {
+      updateSet.pa1 = rec.pa1;
+      updateSet.pa2 = rec.pa2;
+      updateSet.average = rec.average;
+    }
+
+    return {
+      updateOne: {
+        filter: { studentId: rec.studentId, subjectId: rec.subjectId },
+        update: { $set: updateSet },
+        upsert: true,
       },
-      upsert: true,
-    },
-  }));
+    };
+  });
 
   if (bulkOps.length > 0) {
     await Marks.bulkWrite(bulkOps);
   }
 
-  // 4. Sync to Google Sheets MARK_<SUBJECT>
-  try {
-    const sheetsPayload = validatedRecords.map((r) => ({
-      rollNumber: r.rollNo,
-      fullName: r.fullName,
-      pa1: r.pa1,
-      pa2: r.pa2,
-      average: r.average,
-      PA: r.average,
-    }));
-    await sheetsService.updateSubjectMarks(subCode, sheetsPayload);
-  } catch (sheetErr) {
-    console.warn(`[MarksService] Google Sheets sync warning for ${subCode}:`, sheetErr.message);
+  // 4. Sync to Google Sheets if PA
+  if (determinedType === 'PA') {
+    try {
+      const sheetsPayload = validatedRecords.map((r) => ({
+        rollNumber: r.rollNo,
+        fullName: r.fullName,
+        pa1: r.pa1,
+        pa2: r.pa2,
+        average: r.average,
+        PA: r.average,
+      }));
+      await sheetsService.updateSubjectMarks(subCode, sheetsPayload);
+    } catch (sheetErr) {
+      console.warn(`[MarksService] Google Sheets sync warning for ${subCode}:`, sheetErr.message);
+    }
   }
 
   return {
     success: true,
     subject: subCode,
+    type: determinedType,
     processed: validatedRecords.length,
     results: validatedRecords.map((r) => ({
       rollNo: r.rollNo,
-      pa1: r.pa1,
-      pa2: r.pa2,
-      average: r.average,
-      status: getPerformanceStatus(r.average),
+      ...(determinedType === 'PRACTICAL'
+        ? { practicalMarks: r.practicalMarks, batch: r.batch }
+        : { pa1: r.pa1, pa2: r.pa2, average: r.average, status: getPerformanceStatus(r.average) }),
     })),
   };
 }
@@ -323,6 +473,8 @@ async function updateMarks(studentId, subjectCode, marksInput) {
 
   return bulkUpdateMarks({
     subject: subCode,
+    type: marksInput.type,
+    batch: marksInput.batch,
     marks: [
       {
         studentId: student._id,
@@ -330,6 +482,11 @@ async function updateMarks(studentId, subjectCode, marksInput) {
         enrollmentNumber: student.enrollmentNumber,
         pa1: marksInput.pa1 !== undefined ? marksInput.pa1 : marksInput.PA1,
         pa2: marksInput.pa2 !== undefined ? marksInput.pa2 : marksInput.PA2,
+        practicalMarks:
+          marksInput.practicalMarks !== undefined
+            ? marksInput.practicalMarks
+            : marksInput.practicalMark,
+        batch: marksInput.batch,
       },
     ],
     academicYear: marksInput.academicYear,

@@ -32,7 +32,7 @@ const ACADEMIC_CONFIG = {
     'NCC Administrator',
   ],
 
-  // Active Subjects for 5th Semester Computer Engineering (Exactly 5 subjects)
+  // Active Subjects for 5th Semester Computer Engineering
   // Source: Official MSBTE Scheme (315xxx series)
   SUBJECTS: [
     { code: 'STE',  name: 'Software Engineering',                        courseCode: '315323' },
@@ -40,17 +40,23 @@ const ACADEMIC_CONFIG = {
     { code: 'OSY',  name: 'Operating System',                            courseCode: '315319' },
     { code: 'SPI',  name: 'Seminar and Project Initiation Course',        courseCode: '315003' },
     { code: 'ENDS', name: 'Entrepreneurship Development and Startups',    courseCode: '315002' },
+    { code: 'ITR',  name: 'Industrial Training',                         courseCode: '315004' },
   ],
 
+  // Subject Categorization for Marks Flow
+  PA_SUBJECTS: ['STE', 'OSY', 'ACN'],
+  PRACTICAL_MARKS_SUBJECTS: ['ENDS', 'SPI', 'ITR'],
+
   // Assessment Structure Matrix
-  PRACTICAL_SUBJECTS: ['STE', 'OSY', 'ACN', 'ENDS'],
+  PRACTICAL_SUBJECTS: ['ENDS', 'SPI', 'ITR'],
   THEORY_PA_SUBJECTS: ['STE', 'OSY', 'ACN'],
   ASSESSMENT_MATRIX: {
-    STE:  { practical: true,  pa1: true,  pa2: true,  average: true },
-    OSY:  { practical: true,  pa1: true,  pa2: true,  average: true },
-    ACN:  { practical: true,  pa1: true,  pa2: true,  average: true },
+    STE:  { practical: false, pa1: true,  pa2: true,  average: true },
+    OSY:  { practical: false, pa1: true,  pa2: true,  average: true },
+    ACN:  { practical: false, pa1: true,  pa2: true,  average: true },
     ENDS: { practical: true,  pa1: false, pa2: false, average: false },
-    SPI:  { practical: false, pa1: false, pa2: false, average: false },
+    SPI:  { practical: true,  pa1: false, pa2: false, average: false },
+    ITR:  { practical: true,  pa1: false, pa2: false, average: false },
   },
 
   // Marks Configuration (PA Only, Max 30)

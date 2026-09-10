@@ -16,9 +16,12 @@ export async function getMyMarks({ semester, academicYear, subjectCode } = {}) {
   return res.data;
 }
 
-/** Faculty/admin: get full student roster with marks for a specific subject */
-export async function getSubjectMarks(subjectCode) {
-  const res = await api.get(`/marks/subject/${encodeURIComponent(subjectCode)}`);
+/** Faculty/admin: get full student roster or batch with marks for a specific subject */
+export async function getSubjectMarks(subjectCode, { batch, type } = {}) {
+  const params = {};
+  if (batch) params.batch = batch;
+  if (type) params.type = type;
+  const res = await api.get(`/marks/subject/${encodeURIComponent(subjectCode)}`, { params });
   return res.data;
 }
 
@@ -51,15 +54,17 @@ export async function updateMarks(studentId, subjectCode, data) {
 }
 
 /**
- * Faculty/admin: SAVE ALL - bulk save all student marks for a subject in one atomic operation.
+ * Faculty/admin: SAVE ALL - bulk save student marks for a subject (PA or Practical) in one atomic operation.
  * @param {object} payload
- * @param {string} payload.subject  - e.g. "STE", "OSY", "ACN"
- * @param {Array<{ rollNo: string|number, pa1: number|null, pa2: number|null }>} payload.marks
+ * @param {string} payload.subject  - e.g. "STE", "OSY", "ACN", "ENDS", "SPI", "ITR"
+ * @param {string} [payload.type]   - "PA" | "PRACTICAL"
+ * @param {string} [payload.batch]  - "A" | "B" | "C"
+ * @param {Array<object>} payload.marks
  * @param {string} [payload.academicYear='2026-2027']
  * @param {number} [payload.semester=5]
  */
-export async function bulkUpdateMarks({ subject, marks, academicYear = '2026-2027', semester = 5 }) {
-  const res = await api.put('/marks/batch', { subject, marks, academicYear, semester });
+export async function bulkUpdateMarks({ subject, marks, type, batch, academicYear = '2026-2027', semester = 5 }) {
+  const res = await api.put('/marks/batch', { subject, marks, type, batch, academicYear, semester });
   return res.data;
 }
 

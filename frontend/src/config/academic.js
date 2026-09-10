@@ -29,24 +29,37 @@ export const ACADEMIC_CONFIG = {
     'NCC Administrator',
   ],
 
-  // Active Subjects for 5th Semester Computer Engineering (Exactly 5 — official MSBTE scheme)
+  // Active Subjects for 5th Semester Computer Engineering
   SUBJECTS: [
     { code: 'STE',  name: 'Software Engineering',                     courseCode: '315323' },
     { code: 'ACN',  name: 'Advance Computer Network',                 courseCode: '315321' },
     { code: 'OSY',  name: 'Operating System',                         courseCode: '315319' },
     { code: 'SPI',  name: 'Seminar and Project Initiation Course',    courseCode: '315003' },
     { code: 'ENDS', name: 'Entrepreneurship Development and Startups',courseCode: '315002' },
+    { code: 'ITR',  name: 'Industrial Training',                      courseCode: '315004' },
+  ],
+
+  // Subject Categorization for Marks Flow
+  PA_SUBJECTS: ['STE', 'OSY', 'ACN'],
+  PRACTICAL_MARKS_SUBJECTS: ['ENDS', 'SPI', 'ITR'],
+
+  // Practical Laboratory Batches
+  PRACTICAL_BATCHES: [
+    { batch: 'A', range: 'Roll No. 1–24', minRoll: 1, maxRoll: 24, count: 24 },
+    { batch: 'B', range: 'Roll No. 25–47', minRoll: 25, maxRoll: 47, count: 23 },
+    { batch: 'C', range: 'Roll No. 48–68', minRoll: 48, maxRoll: 68, count: 21 },
   ],
 
   // Assessment Structure Matrix
-  PRACTICAL_SUBJECTS: ['STE', 'OSY', 'ACN', 'ENDS'],
+  PRACTICAL_SUBJECTS: ['ENDS', 'SPI', 'ITR'],
   THEORY_PA_SUBJECTS: ['STE', 'OSY', 'ACN'],
   ASSESSMENT_MATRIX: {
-    STE:  { practical: true,  pa1: true,  pa2: true,  average: true },
-    OSY:  { practical: true,  pa1: true,  pa2: true,  average: true },
-    ACN:  { practical: true,  pa1: true,  pa2: true,  average: true },
+    STE:  { practical: false, pa1: true,  pa2: true,  average: true },
+    OSY:  { practical: false, pa1: true,  pa2: true,  average: true },
+    ACN:  { practical: false, pa1: true,  pa2: true,  average: true },
     ENDS: { practical: true,  pa1: false, pa2: false, average: false },
-    SPI:  { practical: false, pa1: false, pa2: false, average: false },
+    SPI:  { practical: true,  pa1: false, pa2: false, average: false },
+    ITR:  { practical: true,  pa1: false, pa2: false, average: false },
   },
 
   // Marks Configuration (PA only, 0–30)
