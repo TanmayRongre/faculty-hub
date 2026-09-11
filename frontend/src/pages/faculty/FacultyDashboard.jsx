@@ -215,6 +215,39 @@ const FacultyDashboard = () => {
         </div>
 
         {/* ========================================================================= */}
+        {/* SYSTEM MODULES & NAVIGATION GRID (TOP LEVEL) */}
+        {/* ========================================================================= */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Layers className="w-5 h-5 text-blue-400" />
+            <h2 className="text-lg font-bold text-white tracking-wide uppercase">
+              System Modules & Navigation
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            {modules.map((m) => {
+              const Icon = m.icon;
+              return (
+                <div
+                  key={m.label}
+                  onClick={() => navigate(m.to)}
+                  className="bg-slate-900 border border-slate-800 rounded-xl p-5 cursor-pointer transition-all hover:border-blue-500/50 hover:bg-slate-800/80 group shadow-md"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-slate-800 group-hover:bg-blue-600/20 flex items-center justify-center mb-3 text-blue-400 transition-colors">
+                    <Icon size={20} />
+                  </div>
+                  <h3 className="font-semibold text-white group-hover:text-blue-300 transition-colors">
+                    {m.label}
+                  </h3>
+                  <p className="text-sm text-slate-400 mt-1">{m.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
         {/* SUMMARY CARDS */}
         {/* ========================================================================= */}
         {isAdmin && (
@@ -583,39 +616,6 @@ const FacultyDashboard = () => {
             )}
           </div>
         )}
-
-        {/* ========================================================================= */}
-        {/* ACADEMIC & INSTITUTIONAL MODULES GRID */}
-        {/* ========================================================================= */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Layers className="w-5 h-5 text-slate-400" />
-            <h2 className="text-lg font-bold text-white tracking-wide uppercase">
-              System Modules & Navigation
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {modules.map((m) => {
-              const Icon = m.icon;
-              return (
-                <div
-                  key={m.label}
-                  onClick={() => navigate(m.to)}
-                  className="bg-slate-900 border border-slate-800 rounded-xl p-5 cursor-pointer transition-all hover:border-blue-500/50 hover:bg-slate-800/80 group"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-slate-800 group-hover:bg-blue-600/20 flex items-center justify-center mb-3 text-blue-400 transition-colors">
-                    <Icon size={20} />
-                  </div>
-                  <h3 className="font-semibold text-white group-hover:text-blue-300 transition-colors">
-                    {m.label}
-                  </h3>
-                  <p className="text-sm text-slate-400 mt-1">{m.desc}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
       </div>
     </FacultyLayout>
   );
